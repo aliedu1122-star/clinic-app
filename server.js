@@ -63,7 +63,6 @@ const cpUpload = upload.fields([
     { name: 'labsFile', maxCount: 1 }
 ]);
 
-// دالة مساعدة لحذف الملفات الفيزيائية من المجلد
 function deletePhysicalFiles(files) {
     files.forEach(file => {
         if (file) {
@@ -170,12 +169,9 @@ app.post('/api/visit', cpUpload, (req, res) => {
 
         let patientId = passedPatientId ? parseInt(passedPatientId) : null;
 
-        // إدارة المريض بحذر شديد لتجنب التداخل
         if (patientId) {
-            // تحديث بيانات مريض قائم بالفعل بناء على ID صريح
             db.prepare('UPDATE patients SET name = ?, age = ?, phone = ? WHERE id = ?').run(cleanName, age, cleanPhone, patientId);
         } else {
-            // البحث برقم التليفون لعدم تكرار السجلات
             let existingPatient = db.prepare('SELECT id FROM patients WHERE phone = ?').get(cleanPhone);
             if (existingPatient) {
                 patientId = existingPatient.id;
@@ -193,7 +189,6 @@ app.post('/api/visit', cpUpload, (req, res) => {
         const labsFile = req.files && req.files['labsFile'] ? req.files['labsFile'][0].filename : null;
 
         if (visitId && visitId !== '') {
-            // تعديل زيارة معينة
             const currentVisit = db.prepare('SELECT * FROM visits WHERE id = ?').get(visitId);
             if (currentVisit) {
                 db.prepare(`
@@ -211,7 +206,6 @@ app.post('/api/visit', cpUpload, (req, res) => {
                 );
             }
         } else {
-            // إضافة زيارة جديدة للمريض
             db.prepare(`
                 INSERT INTO visits (patient_id, visit_date, visit_type, diagnosis, medication_type, medication_text, medication_file, has_ecg, ecg_file, has_rays, rays_file, has_other_rays, other_rays_file, has_labs, labs_file)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -266,7 +260,6 @@ app.delete('/api/patient/:id', (req, res) => {
     try {
         const visits = db.prepare('SELECT medication_file, ecg_file, rays_file, other_rays_file, labs_file FROM visits WHERE patient_id = ?').all(req.params.id);
         
-        // مسح الصور والملفات من المجلد
         visits.forEach(v => {
             deletePhysicalFiles([v.medication_file, v.ecg_file, v.rays_file, v.other_rays_file, v.labs_file]);
         });
