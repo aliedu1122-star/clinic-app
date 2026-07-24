@@ -3,6 +3,7 @@ const Database = require('better-sqlite3');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const archiver = require('archiver'); // إضافة مكتبة الضغط
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -81,18 +82,47 @@ const cpUpload = upload.fields([
     { name: 'labsFile', maxCount: 1 }
 ]);
 
-// رابط تنزيل النسخة الاحتياطية (Backup)
-app.get('/api/backup', (req, res) => {
+// رابط تنزيل النسخة الاحتياطية الشاملة (قاعدة البيانات + مجلد الصور والمرفقات)
+app.get('/api/backup', async (req, res) => {
+    const dateStr = new Date().toISOString().split('T')[0];
+    const tempDbPath = `./clinic_backup_temp_${dateStr}.db`;
+    const zipFilename = `clinic_full_backup_${dateStr}.zip`;
+
     try {
-        const file = './clinic.db';
-        if (fs.existsSync(file)) {
-            const dateStr = new Date().toISOString().split('T')[0];
-            res.download(file, `clinic_backup_${dateStr}.db`);
-        } else {
-            res.status(404).send("قاعدة البيانات غير موجودة");
+        await db.backup(tempDbPath);
+
+        res.attachment(zipFilename);
+
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        archive.on('error', (err) => {
+            throw err;
+        });
+
+        res.on('finish', () => {
+            if (fs.existsSync(tempDbPath)) {
+                fs.unlinkSync(tempDbPath);
+            }
+        });
+
+        archive.pipe(res);
+
+        archive.file(tempDbPath, { name: `clinic_${dateStr}.db` });
+
+        if (fs.existsSync('./uploads')) {
+            archive.directory('./uploads/', 'uploads');
         }
+
+        await archive.finalize();
+
     } catch (error) {
-        res.status(500).send("حدث خطأ أثناء تنزيل النسخة الاحتياطية");
+        console.error('Backup Error:', error);
+        if (fs.existsSync(tempDbPath)) {
+            fs.unlinkSync(tempDbPath);
+        }
+        if (!res.headersSent) {
+            res.status(500).send("حدث خطأ أثناء تنزيل النسخة الاحتياطية الشاملة");
+        }
     }
 });
 
