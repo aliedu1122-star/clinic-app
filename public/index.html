@@ -300,34 +300,42 @@
       toggleFileView('labsFileContainer', 'لا');
     }
 
-    function editVisit(pName, pAge, pPhone, visit) {
-      document.getElementById('visitId').value = visit.id;
+    // طريقة آمنة لتمرير بيانات الزيارة دون مشاكل الرموز والحماية من XSS
+    function editVisitByParams(pName, pAge, pPhone, visitId) {
+      let foundVisit = null;
+      for (const p of globalPatients) {
+        const v = p.visits.find(x => x.id === visitId);
+        if (v) { foundVisit = v; break; }
+      }
+      if (!foundVisit) return;
+
+      document.getElementById('visitId').value = foundVisit.id;
       document.getElementById('name').value = pName;
       document.getElementById('age').value = pAge;
       document.getElementById('phone').value = pPhone;
-      document.getElementById('visitDate').value = visit.visit_date;
+      document.getElementById('visitDate').value = foundVisit.visit_date;
 
       const visitTypeSelect = document.getElementById('visitType');
-      if (['كشف', 'استشارة', 'متابعة'].includes(visit.visit_type)) {
-        visitTypeSelect.value = visit.visit_type;
+      if (['كشف', 'استشارة', 'متابعة'].includes(foundVisit.visit_type)) {
+        visitTypeSelect.value = foundVisit.visit_type;
         document.getElementById('customVisitType').classList.add('hidden');
-      } else if (visit.visit_type) {
+      } else if (foundVisit.visit_type) {
         visitTypeSelect.value = 'آخر';
-        document.getElementById('customVisitType').value = visit.visit_type;
+        document.getElementById('customVisitType').value = foundVisit.visit_type;
         document.getElementById('customVisitType').classList.remove('hidden');
       }
 
       const diagSelect = document.getElementById('diagnosis');
-      if (['ارتفاع ضغط الدم (Hypertension)', 'قصور الشرايين التاجية (CAD)', 'ضعف عضلة القلب (Heart Failure)', 'اضطراب ضربات القلب (Arrhythmia)', 'اعتلال صمامات القلب'].includes(visit.diagnosis)) {
-        diagSelect.value = visit.diagnosis;
+      if (['ارتفاع ضغط الدم (Hypertension)', 'قصور الشرايين التاجية (CAD)', 'ضعف عضلة القلب (Heart Failure)', 'اضطراب ضربات القلب (Arrhythmia)', 'اعتلال صمامات القلب'].includes(foundVisit.diagnosis)) {
+        diagSelect.value = foundVisit.diagnosis;
         document.getElementById('customDiagnosis').classList.add('hidden');
-      } else if (visit.diagnosis) {
+      } else if (foundVisit.diagnosis) {
         diagSelect.value = 'آخر';
-        document.getElementById('customDiagnosis').value = visit.diagnosis;
+        document.getElementById('customDiagnosis').value = foundVisit.diagnosis;
         document.getElementById('customDiagnosis').classList.remove('hidden');
       }
 
-      document.getElementById('formTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-400"></i> تعديل الزيارة (${visit.visit_date})`;
+      document.getElementById('formTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-400"></i> تعديل الزيارة (${foundVisit.visit_date})`;
       document.getElementById('cancelEditBtn').classList.remove('hidden');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -377,7 +385,7 @@
                 <i class="fa-solid fa-notes-medical"></i> الزيارة رقم (${index + 1}) - <span class="text-amber-400 font-extrabold">[${v.visit_type || 'كشف'}]</span> بتاريخ: ${v.visit_date}
               </span>
               <div class="flex items-center gap-2" onclick="event.stopPropagation()">
-                <button onclick="editVisit('${p.name}', ${p.age}, '${p.phone}', ${JSON.stringify(v).replace(/"/g, '&quot;')})" class="text-amber-400 hover:text-amber-300 text-xs px-2 py-1 bg-amber-400/10 rounded">
+                <button onclick="editVisitByParams('${p.name.replace(/'/g, "\\'")}', ${p.age}, '${p.phone}', ${v.id})" class="text-amber-400 hover:text-amber-300 text-xs px-2 py-1 bg-amber-400/10 rounded">
                   <i class="fa-solid fa-pen"></i> تعديل
                 </button>
                 <button onclick="deleteVisit(${v.id})" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 bg-rose-400/10 rounded">
@@ -395,27 +403,27 @@
 
               <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-800/80">
                 ${v.medication_file ? `
-                  <button onclick="openModal('/uploads/${v.medication_file}')" class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                  <button onclick="openMedia('/uploads/${v.medication_file}')" class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
                     <i class="fa-solid fa-file-prescription"></i> صورة الروشتة
                   </button>
                 ` : ''}
                 ${v.ecg_file ? `
-                  <button onclick="openModal('/uploads/${v.ecg_file}')" class="bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                  <button onclick="openMedia('/uploads/${v.ecg_file}')" class="bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
                     <i class="fa-solid fa-heart-pulse"></i> رسم القلب
                   </button>
                 ` : ''}
                 ${v.rays_file ? `
-                  <button onclick="openModal('/uploads/${v.rays_file}')" class="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                  <button onclick="openMedia('/uploads/${v.rays_file}')" class="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
                     <i class="fa-solid fa-x-ray"></i> الاشعة / الإيكو
                   </button>
                 ` : ''}
                 ${v.other_rays_file ? `
-                  <button onclick="openModal('/uploads/${v.other_rays_file}')" class="bg-orange-500/10 text-orange-400 border border-orange-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                  <button onclick="openMedia('/uploads/${v.other_rays_file}')" class="bg-orange-500/10 text-orange-400 border border-orange-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
                     <i class="fa-solid fa-radiation"></i> أشعات أخرى
                   </button>
                 ` : ''}
                 ${v.labs_file ? `
-                  <button onclick="openModal('/uploads/${v.labs_file}')" class="bg-purple-500/10 text-purple-400 border border-purple-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                  <button onclick="openMedia('/uploads/${v.labs_file}')" class="bg-purple-500/10 text-purple-400 border border-purple-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
                     <i class="fa-solid fa-vial"></i> صورة التحاليل
                   </button>
                 ` : ''}
@@ -436,7 +444,7 @@
               </div>
               
               <div class="flex items-center gap-2" onclick="event.stopPropagation()">
-                <button onclick="prepareNewVisit('${p.name}', ${p.age}, '${p.phone}')" class="bg-sky-500/20 text-sky-400 border border-sky-500/40 hover:bg-sky-500/30 px-2.5 py-1 rounded-xl text-xs font-bold">
+                <button onclick="prepareNewVisit('${p.name.replace(/'/g, "\\'")}', ${p.age}, '${p.phone}')" class="bg-sky-500/20 text-sky-400 border border-sky-500/40 hover:bg-sky-500/30 px-2.5 py-1 rounded-xl text-xs font-bold">
                   + إضافة زيارة
                 </button>
                 <button onclick="deletePatient(${p.id})" title="حذف الحالة بالكامل" class="bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30 px-2.5 py-1 rounded-xl text-xs font-bold">
@@ -454,9 +462,13 @@
       });
     }
 
-    function openModal(imgSrc) {
-      document.getElementById('modalImg').src = imgSrc;
-      document.getElementById('imageModal').classList.remove('hidden');
+    function openMedia(fileSrc) {
+      if (fileSrc.toLowerCase().endsWith('.pdf')) {
+        window.open(fileSrc, '_blank');
+      } else {
+        document.getElementById('modalImg').src = fileSrc;
+        document.getElementById('imageModal').classList.remove('hidden');
+      }
     }
 
     function closeModal() {
