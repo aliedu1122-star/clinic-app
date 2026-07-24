@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نظام إدارة عيادة القلب</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+    body { font-family: 'Cairo', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+  <div id="toast" class="fixed top-5 left-5 z-50 transform -translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-2xl">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-xl"></i>
+    <span id="toastMsg" class="font-bold text-sm">تمت العملية بنجاح!</span>
+  </div>
+
+  <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700/60 sticky top-0 z-40 px-6 py-4 flex justify-between items-center shadow-lg">
+    <div class="flex items-center gap-3">
+      <div class="bg-rose-500/20 text-rose-500 p-2.5 rounded-xl border border-rose-500/30">
+        <i class="fa-solid fa-heart-pulse text-2xl animate-pulse"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-extrabold text-white">عيادة القلب والأوعية الدموية</h1>
+        <p class="text-xs text-slate-400">سجلات المرضى والزيارات</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+    
+    <!-- Form Panel -->
+    <section class="lg:col-span-5 bg-slate-800/50 border border-slate-700/80 rounded-2xl p-6 shadow-xl h-fit">
+      <div class="flex justify-between items-center mb-4 border-b border-slate-700/80 pb-3">
+        <h2 id="formTitle" class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-file-medical text-sky-400"></i> تسجيل كشف / زيارة
+        </h2>
+        <button id="cancelEditBtn" onclick="resetForm()" class="hidden text-xs text-rose-400 hover:underline">إلغاء التعديل</button>
+      </div>
+
+      <form id="clinicForm" class="space-y-4">
+        <input type="hidden" id="visitId" value="">
+        
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2">
+            <label class="block text-xs font-bold text-slate-300 mb-1">اسم المريض *</label>
+            <input type="text" id="name" required placeholder="اسم المريض بالكامل..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">السن *</label>
+            <input type="number" id="age" required placeholder="السن" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">رقم الهاتف *</label>
+            <input type="text" id="phone" required placeholder="01xxxxxxxx" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">تاريخ الزيارة</label>
+            <input type="date" id="visitDate" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">نوع الزيارة</label>
+            <select id="visitType" onchange="toggleCustomVisitType(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none">
+              <option value="كشف">كشف</option>
+              <option value="استشارة">استشارة</option>
+              <option value="متابعة">متابعة</option>
+              <option value="آخر">كتابة يدوية...</option>
+            </select>
+          </div>
+        </div>
+        <input type="text" id="customVisitType" placeholder="اكتب نوع الزيارة..." class="hidden w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white outline-none">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1">التشخيص الطبي</label>
+          <select id="diagnosis" onchange="toggleCustomDiagnosis(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none mb-2">
+            <option value="">-- اختر التشخيص --</option>
+            <option value="ارتفاع ضغط الدم (Hypertension)">ارتفاع ضغط الدم (Hypertension)</option>
+            <option value="قصور الشرايين التاجية (CAD)">قصور الشرايين التاجية (CAD)</option>
+            <option value="ضعف عضلة القلب (Heart Failure)">ضعف عضلة القلب (Heart Failure)</option>
+            <option value="اضطراب ضربات القلب (Arrhythmia)">اضطراب ضربات القلب (Arrhythmia)</option>
+            <option value="اعتلال صمامات القلب">اعتلال صمامات القلب</option>
+            <option value="آخر">تشخيص آخر (يدوي)...</option>
+          </select>
+          <input type="text" id="customDiagnosis" placeholder="اكتب التشخيص هنا..." class="hidden w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white outline-none">
+        </div>
+
+        <div class="border-t border-slate-700/60 pt-3">
+          <label class="block text-xs font-bold text-sky-400 mb-2">نوع الروشتة</label>
+          <div class="flex gap-4 mb-2">
+            <label class="inline-flex items-center text-xs cursor-pointer">
+              <input type="radio" name="medicationType" value="text" checked onchange="toggleMedicationView('text')">
+              <span class="mr-2">روشتة نصية</span>
+            </label>
+            <label class="inline-flex items-center text-xs cursor-pointer">
+              <input type="radio" name="medicationType" value="file" onchange="toggleMedicationView('file')">
+              <span class="mr-2">صورة الروشتة</span>
+            </label>
+          </div>
+          <div id="medTextContainer">
+            <textarea id="medicationText" rows="2" placeholder="اكتب العلاج..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white outline-none resize-none"></textarea>
+          </div>
+          <div id="medFileContainer" class="hidden">
+            <input type="file" id="medicationFile" accept="image/*,.pdf" class="w-full text-xs text-slate-400 bg-slate-900 border border-slate-700 rounded-xl p-2">
+          </div>
+        </div>
+
+        <div class="border-t border-slate-700/60 pt-3 grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-bold text-rose-400 mb-1">رسم قلب؟</label>
+            <select id="hasEcg" onchange="toggleFileView('ecgFileContainer', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white outline-none">
+              <option value="لا">لا</option>
+              <option value="نعم">نعم</option>
+            </select>
+            <div id="ecgFileContainer" class="hidden mt-2">
+              <input type="file" id="ecgFile" accept="image/*,.pdf" class="w-full text-[10px] text-slate-400 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-amber-400 mb-1">أشعة / إيكو؟</label>
+            <select id="hasRays" onchange="toggleFileView('raysFileContainer', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white outline-none">
+              <option value="لا">لا</option>
+              <option value="نعم">نعم</option>
+            </select>
+            <div id="raysFileContainer" class="hidden mt-2">
+              <input type="file" id="raysFile" accept="image/*,.pdf" class="w-full text-[10px] text-slate-400 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-orange-400 mb-1">أشعات أخرى؟</label>
+            <select id="hasOtherRays" onchange="toggleFileView('otherRaysFileContainer', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white outline-none">
+              <option value="لا">لا</option>
+              <option value="نعم">نعم</option>
+            </select>
+            <div id="otherRaysFileContainer" class="hidden mt-2">
+              <input type="file" id="otherRaysFile" accept="image/*,.pdf" class="w-full text-[10px] text-slate-400 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-purple-400 mb-1">تحاليل؟</label>
+            <select id="hasLabs" onchange="toggleFileView('labsFileContainer', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white outline-none">
+              <option value="لا">لا</option>
+              <option value="نعم">نعم</option>
+            </select>
+            <div id="labsFileContainer" class="hidden mt-2">
+              <input type="file" id="labsFile" accept="image/*,.pdf" class="w-full text-[10px] text-slate-400 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="submitBtn" class="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 text-white font-bold py-2.5 rounded-xl shadow-lg transition text-sm mt-4">
+          <i class="fa-solid fa-floppy-disk"></i> حفظ الكشف
+        </button>
+      </form>
+    </section>
+
+    <!-- Patients Folder List -->
+    <section class="lg:col-span-7 space-y-4">
+      <div class="bg-slate-800/50 border border-slate-700/80 rounded-2xl p-3.5 flex items-center gap-3 shadow-lg">
+        <i class="fa-solid fa-magnifying-glass text-slate-400"></i>
+        <input type="text" id="searchInput" oninput="loadPatients()" placeholder="ابحث باسم المريض أو التليفون..." class="bg-transparent text-white w-full text-sm outline-none">
+      </div>
+
+      <div id="patientsContainer" class="space-y-4 max-h-[680px] overflow-y-auto pr-1"></div>
+    </section>
+
+  </main>
+
+  <!-- Modal View Images -->
+  <div id="imageModal" class="fixed inset-0 z-50 bg-black/90 hidden backdrop-blur-md flex items-center justify-center p-4">
+    <div class="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center">
+      <button onclick="closeModal()" class="absolute -top-10 right-0 text-white hover:text-rose-400">
+        <i class="fa-solid fa-xmark text-xl"></i> إغلاق
+      </button>
+      <img id="modalImg" src="" class="max-w-full max-h-[80vh] rounded-xl border border-slate-700 shadow-2xl object-contain">
+    </div>
+  </div>
+
+  <script>
+    let globalPatients = [];
+    document.getElementById('visitDate').valueAsDate = new Date();
+
+    function toggleCustomVisitType(val) {
+      document.getElementById('customVisitType').classList.toggle('hidden', val !== 'آخر');
+    }
+
+    function toggleCustomDiagnosis(val) {
+      document.getElementById('customDiagnosis').classList.toggle('hidden', val !== 'آخر');
+    }
+
+    function toggleMedicationView(type) {
+      document.getElementById('medTextContainer').classList.toggle('hidden', type !== 'text');
+      document.getElementById('medFileContainer').classList.toggle('hidden', type !== 'file');
+    }
+
+    function toggleFileView(containerId, val) {
+      document.getElementById(containerId).classList.toggle('hidden', val !== 'نعم');
+    }
+
+    function showToast(msg, isErr = false) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').innerText = msg;
+      toast.className = `fixed top-5 left-5 z-50 transform transition-all duration-300 flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl ${isErr ? 'bg-rose-600' : 'bg-emerald-600'}`;
+      toast.classList.remove('-translate-y-20', 'opacity-0');
+      setTimeout(() => toast.classList.add('-translate-y-20', 'opacity-0'), 3000);
+    }
+
+    function toggleFolder(patientId) {
+      const folder = document.getElementById(`folder-content-${patientId}`);
+      const icon = document.getElementById(`folder-icon-${patientId}`);
+      folder.classList.toggle('hidden');
+      icon.classList.toggle('rotate-180');
+    }
+
+    function toggleVisitDetails(visitId) {
+      const details = document.getElementById(`visit-details-${visitId}`);
+      details.classList.toggle('hidden');
+    }
+
+    document.getElementById('clinicForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData();
+      formData.append('visitId', document.getElementById('visitId').value);
+      formData.append('name', document.getElementById('name').value);
+      formData.append('age', document.getElementById('age').value);
+      formData.append('phone', document.getElementById('phone').value);
+      formData.append('visitDate', document.getElementById('visitDate').value);
+      formData.append('visitType', document.getElementById('visitType').value);
+      formData.append('customVisitType', document.getElementById('customVisitType').value);
+      formData.append('diagnosis', document.getElementById('diagnosis').value);
+      formData.append('customDiagnosis', document.getElementById('customDiagnosis').value);
+
+      const medType = document.querySelector('input[name="medicationType"]:checked').value;
+      formData.append('medicationType', medType);
+      formData.append('medicationText', document.getElementById('medicationText').value);
+      if (medType === 'file' && document.getElementById('medicationFile').files[0]) {
+        formData.append('medicationFile', document.getElementById('medicationFile').files[0]);
+      }
+
+      const hasEcg = document.getElementById('hasEcg').value;
+      formData.append('hasEcg', hasEcg);
+      if (hasEcg === 'نعم' && document.getElementById('ecgFile').files[0]) {
+        formData.append('ecgFile', document.getElementById('ecgFile').files[0]);
+      }
+
+      const hasRays = document.getElementById('hasRays').value;
+      formData.append('hasRays', hasRays);
+      if (hasRays === 'نعم' && document.getElementById('raysFile').files[0]) {
+        formData.append('raysFile', document.getElementById('raysFile').files[0]);
+      }
+
+      const hasOtherRays = document.getElementById('hasOtherRays').value;
+      formData.append('hasOtherRays', hasOtherRays);
+      if (hasOtherRays === 'نعم' && document.getElementById('otherRaysFile').files[0]) {
+        formData.append('otherRaysFile', document.getElementById('otherRaysFile').files[0]);
+      }
+
+      const hasLabs = document.getElementById('hasLabs').value;
+      formData.append('hasLabs', hasLabs);
+      if (hasLabs === 'نعم' && document.getElementById('labsFile').files[0]) {
+        formData.append('labsFile', document.getElementById('labsFile').files[0]);
+      }
+
+      const res = await fetch('/api/visit', { method: 'POST', body: formData });
+      if (res.ok) {
+        showToast("تم الحفظ بنجاح!");
+        resetForm();
+        loadPatients();
+      } else {
+        showToast("حدث خطأ أثناء الحفظ", true);
+      }
+    });
+
+    function resetForm() {
+      document.getElementById('clinicForm').reset();
+      document.getElementById('visitId').value = '';
+      document.getElementById('visitDate').valueAsDate = new Date();
+      document.getElementById('customVisitType').classList.add('hidden');
+      document.getElementById('customDiagnosis').classList.add('hidden');
+      document.getElementById('formTitle').innerHTML = `<i class="fa-solid fa-file-medical text-sky-400"></i> تسجيل كشف / زيارة`;
+      document.getElementById('cancelEditBtn').classList.add('hidden');
+      toggleMedicationView('text');
+      toggleFileView('ecgFileContainer', 'لا');
+      toggleFileView('raysFileContainer', 'لا');
+      toggleFileView('otherRaysFileContainer', 'لا');
+      toggleFileView('labsFileContainer', 'لا');
+    }
+
+    function editVisit(pName, pAge, pPhone, visit) {
+      document.getElementById('visitId').value = visit.id;
+      document.getElementById('name').value = pName;
+      document.getElementById('age').value = pAge;
+      document.getElementById('phone').value = pPhone;
+      document.getElementById('visitDate').value = visit.visit_date;
+
+      const visitTypeSelect = document.getElementById('visitType');
+      if (['كشف', 'استشارة', 'متابعة'].includes(visit.visit_type)) {
+        visitTypeSelect.value = visit.visit_type;
+        document.getElementById('customVisitType').classList.add('hidden');
+      } else if (visit.visit_type) {
+        visitTypeSelect.value = 'آخر';
+        document.getElementById('customVisitType').value = visit.visit_type;
+        document.getElementById('customVisitType').classList.remove('hidden');
+      }
+
+      const diagSelect = document.getElementById('diagnosis');
+      if (['ارتفاع ضغط الدم (Hypertension)', 'قصور الشرايين التاجية (CAD)', 'ضعف عضلة القلب (Heart Failure)', 'اضطراب ضربات القلب (Arrhythmia)', 'اعتلال صمامات القلب'].includes(visit.diagnosis)) {
+        diagSelect.value = visit.diagnosis;
+        document.getElementById('customDiagnosis').classList.add('hidden');
+      } else if (visit.diagnosis) {
+        diagSelect.value = 'آخر';
+        document.getElementById('customDiagnosis').value = visit.diagnosis;
+        document.getElementById('customDiagnosis').classList.remove('hidden');
+      }
+
+      document.getElementById('formTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-400"></i> تعديل الزيارة (${visit.visit_date})`;
+      document.getElementById('cancelEditBtn').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function deletePatient(id) {
+      if (confirm("هل أنت تأكد من حذف ملف المريض بالكامل مع كل زياراته؟")) {
+        await fetch(`/api/patient/${id}`, { method: 'DELETE' });
+        showToast("تم حذف ملف المريض بالكامل");
+        loadPatients();
+      }
+    }
+
+    async function deleteVisit(id) {
+      if (confirm("هل أنت تأكد من حذف هذه الزيارة؟")) {
+        await fetch(`/api/visit/${id}`, { method: 'DELETE' });
+        showToast("تم حذف الزيارة");
+        loadPatients();
+      }
+    }
+
+    function prepareNewVisit(name, age, phone) {
+      resetForm();
+      document.getElementById('name').value = name;
+      document.getElementById('age').value = age;
+      document.getElementById('phone').value = phone;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function loadPatients() {
+      const q = document.getElementById('searchInput').value;
+      const res = await fetch(`/api/patients?q=${q}`);
+      const patients = await res.json();
+      globalPatients = patients;
+      const container = document.getElementById('patientsContainer');
+      container.innerHTML = '';
+
+      if (patients.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 text-slate-500">لا توجد سجلات مطابقة</div>`;
+        return;
+      }
+
+      patients.forEach(p => {
+        let visitsHTML = p.visits.map((v, index) => `
+          <div class="border border-slate-700/60 rounded-xl bg-slate-900/60 overflow-hidden">
+            <div onclick="toggleVisitDetails(${v.id})" class="p-3 bg-slate-800/80 cursor-pointer flex justify-between items-center hover:bg-slate-700/50 transition">
+              <span class="font-bold text-xs text-sky-400 flex items-center gap-2">
+                <i class="fa-solid fa-notes-medical"></i> الزيارة رقم (${index + 1}) - <span class="text-amber-400 font-extrabold">[${v.visit_type || 'كشف'}]</span> بتاريخ: ${v.visit_date}
+              </span>
+              <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                <button onclick="editVisit('${p.name}', ${p.age}, '${p.phone}', ${JSON.stringify(v).replace(/"/g, '&quot;')})" class="text-amber-400 hover:text-amber-300 text-xs px-2 py-1 bg-amber-400/10 rounded">
+                  <i class="fa-solid fa-pen"></i> تعديل
+                </button>
+                <button onclick="deleteVisit(${v.id})" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 bg-rose-400/10 rounded">
+                  <i class="fa-solid fa-trash"></i> حذف
+                </button>
+                <i class="fa-solid fa-chevron-down text-slate-400 text-xs mr-1"></i>
+              </div>
+            </div>
+
+            <div id="visit-details-${v.id}" class="hidden p-3 border-t border-slate-700/40 text-xs space-y-2 bg-slate-900/90">
+              <div><strong class="text-slate-400">التشخيص:</strong> ${v.diagnosis || 'غير محدد'}</div>
+              ${v.medication_type === 'text' && v.medication_text ? `
+                <div><strong class="text-slate-400">العلاج:</strong> <span class="text-emerald-400 font-mono">${v.medication_text}</span></div>
+              ` : ''}
+
+              <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-800/80">
+                ${v.medication_file ? `
+                  <button onclick="openModal('/uploads/${v.medication_file}')" class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                    <i class="fa-solid fa-file-prescription"></i> صورة الروشتة
+                  </button>
+                ` : ''}
+                ${v.ecg_file ? `
+                  <button onclick="openModal('/uploads/${v.ecg_file}')" class="bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                    <i class="fa-solid fa-heart-pulse"></i> رسم القلب
+                  </button>
+                ` : ''}
+                ${v.rays_file ? `
+                  <button onclick="openModal('/uploads/${v.rays_file}')" class="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                    <i class="fa-solid fa-x-ray"></i> الاشعة / الإيكو
+                  </button>
+                ` : ''}
+                ${v.other_rays_file ? `
+                  <button onclick="openModal('/uploads/${v.other_rays_file}')" class="bg-orange-500/10 text-orange-400 border border-orange-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                    <i class="fa-solid fa-radiation"></i> أشعات أخرى
+                  </button>
+                ` : ''}
+                ${v.labs_file ? `
+                  <button onclick="openModal('/uploads/${v.labs_file}')" class="bg-purple-500/10 text-purple-400 border border-purple-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                    <i class="fa-solid fa-vial"></i> صورة التحاليل
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        container.innerHTML += `
+          <div class="border border-slate-700/80 rounded-2xl bg-slate-800/60 shadow-lg overflow-hidden">
+            <div class="p-4 bg-slate-800 flex justify-between items-center cursor-pointer border-b border-slate-700/50" onclick="toggleFolder(${p.id})">
+              <div class="flex items-center gap-3">
+                <i class="fa-solid fa-folder-closed text-amber-400 text-2xl"></i>
+                <div>
+                  <h3 class="font-bold text-base text-white">${p.name} <span class="text-xs text-slate-400">(${p.age} سنة)</span></h3>
+                  <p class="text-xs text-slate-400"><i class="fa-solid fa-phone text-[10px] mr-1"></i> ${p.phone} | <span class="text-sky-400 font-bold">${p.visits.length} زيارات</span></p>
+                </div>
+              </div>
+              
+              <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                <button onclick="prepareNewVisit('${p.name}', ${p.age}, '${p.phone}')" class="bg-sky-500/20 text-sky-400 border border-sky-500/40 hover:bg-sky-500/30 px-2.5 py-1 rounded-xl text-xs font-bold">
+                  + إضافة زيارة
+                </button>
+                <button onclick="deletePatient(${p.id})" title="حذف الحالة بالكامل" class="bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30 px-2.5 py-1 rounded-xl text-xs font-bold">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+                <i id="folder-icon-${p.id}" class="fa-solid fa-chevron-down text-slate-400 text-sm transition-transform duration-200 mr-1"></i>
+              </div>
+            </div>
+
+            <div id="folder-content-${p.id}" class="hidden p-4 space-y-3 bg-slate-900/40">
+              ${p.visits.length > 0 ? visitsHTML : '<div class="text-xs text-slate-500 text-center">لا توجد زيارات مسجلة لهذا المريض</div>'}
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function openModal(imgSrc) {
+      document.getElementById('modalImg').src = imgSrc;
+      document.getElementById('imageModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('imageModal').classList.add('hidden');
+    }
+
+    loadPatients();
+  </script>
+</body>
+</html>
