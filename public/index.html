@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -13,7 +14,7 @@
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
 
-  <div id="toast" class="fixed top-5 left-5 z-50 transform -translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-2xl">
+  <div id="toast" class="fixed top-5 left-5 z-50 transform -translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-2xl pointer-events-none">
     <i id="toastIcon" class="fa-solid fa-circle-check text-xl"></i>
     <span id="toastMsg" class="font-bold text-sm">تمت العملية بنجاح!</span>
   </div>
@@ -29,7 +30,6 @@
       </div>
     </div>
     
-    <!-- زر تحميل النسخة الاحتياطية -->
     <a href="/api/backup" download class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg transition">
       <i class="fa-solid fa-download"></i>
       <span>تحميل نسخة احتياطية (Backup)</span>
@@ -181,8 +181,8 @@
   </main>
 
   <!-- Modal View Images -->
-  <div id="imageModal" class="fixed inset-0 z-50 bg-black/90 hidden backdrop-blur-md flex items-center justify-center p-4">
-    <div class="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center">
+  <div id="imageModal" class="fixed inset-0 z-50 bg-black/90 hidden backdrop-blur-md flex items-center justify-center p-4" onclick="closeModal()">
+    <div class="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center" onclick="event.stopPropagation()">
       <button onclick="closeModal()" class="absolute -top-10 right-0 text-white hover:text-rose-400">
         <i class="fa-solid fa-xmark text-xl"></i> إغلاق
       </button>
@@ -193,6 +193,17 @@
   <script>
     let globalPatients = [];
     document.getElementById('visitDate').valueAsDate = new Date();
+
+    // دالة للوقاية من ثغرات XSS
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
 
     function toggleCustomVisitType(val) {
       document.getElementById('customVisitType').classList.toggle('hidden', val !== 'آخر');
@@ -222,17 +233,21 @@
     function toggleFolder(patientId) {
       const folder = document.getElementById(`folder-content-${patientId}`);
       const icon = document.getElementById(`folder-icon-${patientId}`);
-      folder.classList.toggle('hidden');
-      icon.classList.toggle('rotate-180');
+      if (folder) folder.classList.toggle('hidden');
+      if (icon) icon.classList.toggle('rotate-180');
     }
 
     function toggleVisitDetails(visitId) {
       const details = document.getElementById(`visit-details-${visitId}`);
-      details.classList.toggle('hidden');
+      if (details) details.classList.toggle('hidden');
     }
 
     document.getElementById('clinicForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
       const formData = new FormData();
       formData.append('visitId', document.getElementById('visitId').value);
       formData.append('name', document.getElementById('name').value);
@@ -275,13 +290,20 @@
         formData.append('labsFile', document.getElementById('labsFile').files[0]);
       }
 
-      const res = await fetch('/api/visit', { method: 'POST', body: formData });
-      if (res.ok) {
-        showToast("تم الحفظ بنجاح!");
-        resetForm();
-        loadPatients();
-      } else {
-        showToast("حدث خطأ أثناء الحفظ", true);
+      try {
+        const res = await fetch('/api/visit', { method: 'POST', body: formData });
+        if (res.ok) {
+          showToast("تم الحفظ بنجاح!");
+          resetForm();
+          loadPatients();
+        } else {
+          showToast("حدث خطأ أثناء الحفظ", true);
+        }
+      } catch (err) {
+        showToast("فشل الاتصال بالسيرفر", true);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
       }
     });
 
@@ -300,19 +322,24 @@
       toggleFileView('labsFileContainer', 'لا');
     }
 
-    // طريقة آمنة لتمرير بيانات الزيارة دون مشاكل الرموز والحماية من XSS
-    function editVisitByParams(pName, pAge, pPhone, visitId) {
+    function editVisit(visitId) {
       let foundVisit = null;
+      let foundPatient = null;
+
       for (const p of globalPatients) {
         const v = p.visits.find(x => x.id === visitId);
-        if (v) { foundVisit = v; break; }
+        if (v) { 
+          foundVisit = v; 
+          foundPatient = p;
+          break; 
+        }
       }
       if (!foundVisit) return;
 
       document.getElementById('visitId').value = foundVisit.id;
-      document.getElementById('name').value = pName;
-      document.getElementById('age').value = pAge;
-      document.getElementById('phone').value = pPhone;
+      document.getElementById('name').value = foundPatient.name;
+      document.getElementById('age').value = foundPatient.age;
+      document.getElementById('phone').value = foundPatient.phone;
       document.getElementById('visitDate').value = foundVisit.visit_date;
 
       const visitTypeSelect = document.getElementById('visitType');
@@ -335,131 +362,154 @@
         document.getElementById('customDiagnosis').classList.remove('hidden');
       }
 
-      document.getElementById('formTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-400"></i> تعديل الزيارة (${foundVisit.visit_date})`;
+      document.getElementById('formTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-400"></i> تعديل الزيارة (${escapeHtml(foundVisit.visit_date)})`;
       document.getElementById('cancelEditBtn').classList.remove('hidden');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     async function deletePatient(id) {
       if (confirm("هل أنت تأكد من حذف ملف المريض بالكامل مع كل زياراته؟")) {
-        await fetch(`/api/patient/${id}`, { method: 'DELETE' });
-        showToast("تم حذف ملف المريض بالكامل");
-        loadPatients();
+        try {
+          const res = await fetch(`/api/patient/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            showToast("تم حذف ملف المريض بالكامل");
+            loadPatients();
+          } else {
+            showToast("حدث خطأ أثناء الحذف", true);
+          }
+        } catch(err) {
+          showToast("فشل الاتصال بالسيرفر", true);
+        }
       }
     }
 
     async function deleteVisit(id) {
       if (confirm("هل أنت تأكد من حذف هذه الزيارة؟")) {
-        await fetch(`/api/visit/${id}`, { method: 'DELETE' });
-        showToast("تم حذف الزيارة");
-        loadPatients();
+        try {
+          const res = await fetch(`/api/visit/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            showToast("تم حذف الزيارة");
+            loadPatients();
+          } else {
+            showToast("حدث خطأ أثناء الحذف", true);
+          }
+        } catch (err) {
+          showToast("فشل الاتصال بالسيرفر", true);
+        }
       }
     }
 
-    function prepareNewVisit(name, age, phone) {
+    function prepareNewVisit(patientId) {
+      const p = globalPatients.find(x => x.id === patientId);
+      if (!p) return;
       resetForm();
-      document.getElementById('name').value = name;
-      document.getElementById('age').value = age;
-      document.getElementById('phone').value = phone;
+      document.getElementById('name').value = p.name;
+      document.getElementById('age').value = p.age;
+      document.getElementById('phone').value = p.phone;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     async function loadPatients() {
-      const q = document.getElementById('searchInput').value;
-      const res = await fetch(`/api/patients?q=${q}`);
-      const patients = await res.json();
-      globalPatients = patients;
+      const q = encodeURIComponent(document.getElementById('searchInput').value);
       const container = document.getElementById('patientsContainer');
-      container.innerHTML = '';
 
-      if (patients.length === 0) {
-        container.innerHTML = `<div class="text-center py-12 text-slate-500">لا توجد سجلات مطابقة</div>`;
-        return;
-      }
+      try {
+        const res = await fetch(`/api/patients?q=${q}`);
+        const patients = await res.json();
+        globalPatients = patients;
+        container.innerHTML = '';
 
-      patients.forEach(p => {
-        let visitsHTML = p.visits.map((v, index) => `
-          <div class="border border-slate-700/60 rounded-xl bg-slate-900/60 overflow-hidden">
-            <div onclick="toggleVisitDetails(${v.id})" class="p-3 bg-slate-800/80 cursor-pointer flex justify-between items-center hover:bg-slate-700/50 transition">
-              <span class="font-bold text-xs text-sky-400 flex items-center gap-2">
-                <i class="fa-solid fa-notes-medical"></i> الزيارة رقم (${index + 1}) - <span class="text-amber-400 font-extrabold">[${v.visit_type || 'كشف'}]</span> بتاريخ: ${v.visit_date}
-              </span>
-              <div class="flex items-center gap-2" onclick="event.stopPropagation()">
-                <button onclick="editVisitByParams('${p.name.replace(/'/g, "\\'")}', ${p.age}, '${p.phone}', ${v.id})" class="text-amber-400 hover:text-amber-300 text-xs px-2 py-1 bg-amber-400/10 rounded">
-                  <i class="fa-solid fa-pen"></i> تعديل
-                </button>
-                <button onclick="deleteVisit(${v.id})" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 bg-rose-400/10 rounded">
-                  <i class="fa-solid fa-trash"></i> حذف
-                </button>
-                <i class="fa-solid fa-chevron-down text-slate-400 text-xs mr-1"></i>
-              </div>
-            </div>
+        if (!patients || patients.length === 0) {
+          container.innerHTML = `<div class="text-center py-12 text-slate-500">لا توجد سجلات مطابقة</div>`;
+          return;
+        }
 
-            <div id="visit-details-${v.id}" class="hidden p-3 border-t border-slate-700/40 text-xs space-y-2 bg-slate-900/90">
-              <div><strong class="text-slate-400">التشخيص:</strong> ${v.diagnosis || 'غير محدد'}</div>
-              ${v.medication_type === 'text' && v.medication_text ? `
-                <div><strong class="text-slate-400">العلاج:</strong> <span class="text-emerald-400 font-mono">${v.medication_text}</span></div>
-              ` : ''}
-
-              <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-800/80">
-                ${v.medication_file ? `
-                  <button onclick="openMedia('/uploads/${v.medication_file}')" class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
-                    <i class="fa-solid fa-file-prescription"></i> صورة الروشتة
+        patients.forEach(p => {
+          let visitsHTML = p.visits.map((v, index) => `
+            <div class="border border-slate-700/60 rounded-xl bg-slate-900/60 overflow-hidden">
+              <div onclick="toggleVisitDetails(${v.id})" class="p-3 bg-slate-800/80 cursor-pointer flex justify-between items-center hover:bg-slate-700/50 transition">
+                <span class="font-bold text-xs text-sky-400 flex items-center gap-2">
+                  <i class="fa-solid fa-notes-medical"></i> الزيارة رقم (${index + 1}) - <span class="text-amber-400 font-extrabold">[${escapeHtml(v.visit_type) || 'كشف'}]</span> بتاريخ: ${escapeHtml(v.visit_date)}
+                </span>
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <button onclick="editVisit(${v.id})" class="text-amber-400 hover:text-amber-300 text-xs px-2 py-1 bg-amber-400/10 rounded">
+                    <i class="fa-solid fa-pen"></i> تعديل
                   </button>
-                ` : ''}
-                ${v.ecg_file ? `
-                  <button onclick="openMedia('/uploads/${v.ecg_file}')" class="bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
-                    <i class="fa-solid fa-heart-pulse"></i> رسم القلب
+                  <button onclick="deleteVisit(${v.id})" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 bg-rose-400/10 rounded">
+                    <i class="fa-solid fa-trash"></i> حذف
                   </button>
-                ` : ''}
-                ${v.rays_file ? `
-                  <button onclick="openMedia('/uploads/${v.rays_file}')" class="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
-                    <i class="fa-solid fa-x-ray"></i> الاشعة / الإيكو
-                  </button>
-                ` : ''}
-                ${v.other_rays_file ? `
-                  <button onclick="openMedia('/uploads/${v.other_rays_file}')" class="bg-orange-500/10 text-orange-400 border border-orange-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
-                    <i class="fa-solid fa-radiation"></i> أشعات أخرى
-                  </button>
-                ` : ''}
-                ${v.labs_file ? `
-                  <button onclick="openMedia('/uploads/${v.labs_file}')" class="bg-purple-500/10 text-purple-400 border border-purple-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
-                    <i class="fa-solid fa-vial"></i> صورة التحاليل
-                  </button>
-                ` : ''}
-              </div>
-            </div>
-          </div>
-        `).join('');
-
-        container.innerHTML += `
-          <div class="border border-slate-700/80 rounded-2xl bg-slate-800/60 shadow-lg overflow-hidden">
-            <div class="p-4 bg-slate-800 flex justify-between items-center cursor-pointer border-b border-slate-700/50" onclick="toggleFolder(${p.id})">
-              <div class="flex items-center gap-3">
-                <i class="fa-solid fa-folder-closed text-amber-400 text-2xl"></i>
-                <div>
-                  <h3 class="font-bold text-base text-white">${p.name} <span class="text-xs text-slate-400">(${p.age} سنة)</span></h3>
-                  <p class="text-xs text-slate-400"><i class="fa-solid fa-phone text-[10px] mr-1"></i> ${p.phone} | <span class="text-sky-400 font-bold">${p.visits.length} زيارات</span></p>
+                  <i class="fa-solid fa-chevron-down text-slate-400 text-xs mr-1"></i>
                 </div>
               </div>
-              
-              <div class="flex items-center gap-2" onclick="event.stopPropagation()">
-                <button onclick="prepareNewVisit('${p.name.replace(/'/g, "\\'")}', ${p.age}, '${p.phone}')" class="bg-sky-500/20 text-sky-400 border border-sky-500/40 hover:bg-sky-500/30 px-2.5 py-1 rounded-xl text-xs font-bold">
-                  + إضافة زيارة
-                </button>
-                <button onclick="deletePatient(${p.id})" title="حذف الحالة بالكامل" class="bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30 px-2.5 py-1 rounded-xl text-xs font-bold">
-                  <i class="fa-solid fa-trash-can"></i>
-                </button>
-                <i id="folder-icon-${p.id}" class="fa-solid fa-chevron-down text-slate-400 text-sm transition-transform duration-200 mr-1"></i>
+
+              <div id="visit-details-${v.id}" class="hidden p-3 border-t border-slate-700/40 text-xs space-y-2 bg-slate-900/90">
+                <div><strong class="text-slate-400">التشخيص:</strong> ${escapeHtml(v.diagnosis) || 'غير محدد'}</div>
+                ${v.medication_type === 'text' && v.medication_text ? `
+                  <div><strong class="text-slate-400">العلاج:</strong> <span class="text-emerald-400 font-mono">${escapeHtml(v.medication_text)}</span></div>
+                ` : ''}
+
+                <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-800/80">
+                  ${v.medication_file ? `
+                    <button onclick="openMedia('/uploads/${escapeHtml(v.medication_file)}')" class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                      <i class="fa-solid fa-file-prescription"></i> صورة الروشتة
+                    </button>
+                  ` : ''}
+                  ${v.ecg_file ? `
+                    <button onclick="openMedia('/uploads/${escapeHtml(v.ecg_file)}')" class="bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                      <i class="fa-solid fa-heart-pulse"></i> رسم القلب
+                    </button>
+                  ` : ''}
+                  ${v.rays_file ? `
+                    <button onclick="openMedia('/uploads/${escapeHtml(v.rays_file)}')" class="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                      <i class="fa-solid fa-x-ray"></i> الاشعة / الإيكو
+                    </button>
+                  ` : ''}
+                  ${v.other_rays_file ? `
+                    <button onclick="openMedia('/uploads/${escapeHtml(v.other_rays_file)}')" class="bg-orange-500/10 text-orange-400 border border-orange-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                      <i class="fa-solid fa-radiation"></i> أشعات أخرى
+                    </button>
+                  ` : ''}
+                  ${v.labs_file ? `
+                    <button onclick="openMedia('/uploads/${escapeHtml(v.labs_file)}')" class="bg-purple-500/10 text-purple-400 border border-purple-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                      <i class="fa-solid fa-vial"></i> صورة التحاليل
+                    </button>
+                  ` : ''}
+                </div>
               </div>
             </div>
+          `).join('');
 
-            <div id="folder-content-${p.id}" class="hidden p-4 space-y-3 bg-slate-900/40">
-              ${p.visits.length > 0 ? visitsHTML : '<div class="text-xs text-slate-500 text-center">لا توجد زيارات مسجلة لهذا المريض</div>'}
+          container.innerHTML += `
+            <div class="border border-slate-700/80 rounded-2xl bg-slate-800/60 shadow-lg overflow-hidden">
+              <div class="p-4 bg-slate-800 flex justify-between items-center cursor-pointer border-b border-slate-700/50" onclick="toggleFolder(${p.id})">
+                <div class="flex items-center gap-3">
+                  <i class="fa-solid fa-folder-closed text-amber-400 text-2xl"></i>
+                  <div>
+                    <h3 class="font-bold text-base text-white">${escapeHtml(p.name)} <span class="text-xs text-slate-400">(${escapeHtml(p.age)} سنة)</span></h3>
+                    <p class="text-xs text-slate-400"><i class="fa-solid fa-phone text-[10px] mr-1"></i> ${escapeHtml(p.phone)} | <span class="text-sky-400 font-bold">${p.visits.length} زيارات</span></p>
+                  </div>
+                </div>
+                
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <button onclick="prepareNewVisit(${p.id})" class="bg-sky-500/20 text-sky-400 border border-sky-500/40 hover:bg-sky-500/30 px-2.5 py-1 rounded-xl text-xs font-bold">
+                    + إضافة زيارة
+                  </button>
+                  <button onclick="deletePatient(${p.id})" title="حذف الحالة بالكامل" class="bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30 px-2.5 py-1 rounded-xl text-xs font-bold">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                  <i id="folder-icon-${p.id}" class="fa-solid fa-chevron-down text-slate-400 text-sm transition-transform duration-200 mr-1"></i>
+                </div>
+              </div>
+
+              <div id="folder-content-${p.id}" class="hidden p-4 space-y-3 bg-slate-900/40">
+                ${p.visits.length > 0 ? visitsHTML : '<div class="text-xs text-slate-500 text-center">لا توجد زيارات مسجلة لهذا المريض</div>'}
+              </div>
             </div>
-          </div>
-        `;
-      });
+          `;
+        });
+      } catch (err) {
+        container.innerHTML = `<div class="text-center py-12 text-rose-400">حدث خطأ أثناء تحميل البيانات</div>`;
+      }
     }
 
     function openMedia(fileSrc) {
@@ -473,6 +523,7 @@
 
     function closeModal() {
       document.getElementById('imageModal').classList.add('hidden');
+      document.getElementById('modalImg').src = '';
     }
 
     loadPatients();
