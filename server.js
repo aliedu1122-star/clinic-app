@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 if (!fs.existsSync('./uploads')) {
     fs.mkdirSync('./uploads');
@@ -80,6 +80,21 @@ const cpUpload = upload.fields([
     { name: 'otherRaysFile', maxCount: 1 },
     { name: 'labsFile', maxCount: 1 }
 ]);
+
+// رابط تنزيل النسخة الاحتياطية (Backup)
+app.get('/api/backup', (req, res) => {
+    try {
+        const file = './clinic.db';
+        if (fs.existsSync(file)) {
+            const dateStr = new Date().toISOString().split('T')[0];
+            res.download(file, `clinic_backup_${dateStr}.db`);
+        } else {
+            res.status(404).send("قاعدة البيانات غير موجودة");
+        }
+    } catch (error) {
+        res.status(500).send("حدث خطأ أثناء تنزيل النسخة الاحتياطية");
+    }
+});
 
 app.post('/api/visit', cpUpload, (req, res) => {
     try {
@@ -190,5 +205,5 @@ app.delete('/api/visit/:id', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`✅ سيرفر العيادة شغال بنجاح على: http://localhost:${PORT}`);
+    console.log(`✅ سيرفر العيادة شغال بنجاح على البورت: ${PORT}`);
 });
