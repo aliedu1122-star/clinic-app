@@ -3,7 +3,7 @@ const Database = require('better-sqlite3');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const archiver = require('archiver'); // إضافة مكتبة الضغط
+const archiver = require('archiver');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -82,22 +82,22 @@ const cpUpload = upload.fields([
     { name: 'labsFile', maxCount: 1 }
 ]);
 
-// رابط تنزيل النسخة الاحتياطية الشاملة (قاعدة البيانات + مجلد الصور والمرفقات)
+// ----------------------------------------------------
+// رابط النسخة الاحتياطية المُعدل (تقسيم المرضى في مجلدات)
+// ----------------------------------------------------
 app.get('/api/backup', async (req, res) => {
     const dateStr = new Date().toISOString().split('T')[0];
     const tempDbPath = `./clinic_backup_temp_${dateStr}.db`;
-    const zipFilename = `clinic_full_backup_${dateStr}.zip`;
+    const zipFilename = `clinic_patients_backup_${dateStr}.zip`;
 
     try {
+        // 1. عمل نسخة احتياطية مؤقتة من DB لاستمرار القراءة دون قفل الملف
         await db.backup(tempDbPath);
 
         res.attachment(zipFilename);
-
         const archive = archiver('zip', { zlib: { level: 9 } });
 
-        archive.on('error', (err) => {
-            throw err;
-        });
+        archive.on('error', (err) => { throw err; });
 
         res.on('finish', () => {
             if (fs.existsSync(tempDbPath)) {
@@ -107,10 +107,83 @@ app.get('/api/backup', async (req, res) => {
 
         archive.pipe(res);
 
-        archive.file(tempDbPath, { name: `clinic_${dateStr}.db` });
+        // 2. إدراج نسخة الـ DB الأساسية في الجذر
+        archive.file(tempDbPath, { name: `DATABASE_BACKUP_${dateStr}.db` });
 
-        if (fs.existsSync('./uploads')) {
-            archive.directory('./uploads/', 'uploads');
+        // 3. جلب جميع المرضى وزياراتهم من القاعدة
+        const rows = db.prepare(`
+            SELECT p.id as patient_id, p.name, p.age, p.phone,
+                   v.id as visit_id, v.visit_date, v.visit_type, v.diagnosis, 
+                   v.medication_type, v.medication_text, v.medication_file,
+                   v.ecg_file, v.rays_file, v.other_rays_file, v.labs_file
+            FROM patients p
+            LEFT JOIN visits v ON p.id = v.patient_id
+            ORDER BY p.id ASC, v.visit_date ASC
+        `).all();
+
+        // تجميع الزيارات حسب المريض
+        const patientsMap = {};
+        rows.forEach(row => {
+            if (!patientsMap[row.patient_id]) {
+                patientsMap[row.patient_id] = {
+                    name: row.name,
+                    age: row.age,
+                    phone: row.phone,
+                    visits: []
+                };
+            }
+            if (row.visit_id) {
+                patientsMap[row.patient_id].visits.push(row);
+            }
+        });
+
+        const uploadsDir = path.join(__dirname, 'uploads');
+
+        // 4. المرور على كل مريض وإنشاء مجلد باسمه ورقم هاتفه
+        for (const pId in patientsMap) {
+            const patient = patientsMap[pId];
+            // معالجة اسم المريض لإزالة الرموز غير المسموحة في الأسماء
+            const safeName = patient.name.replace(/[\\/:*?"<>|]/g, '_').trim();
+            const folderName = `المرضى/${safeName}_${patient.phone}`;
+
+            let txtContent = `=========================================\n`;
+            txtContent += `ملف مريض: ${patient.name}\n`;
+            txtContent += `السن: ${patient.age} سنة | الهاتف: ${patient.phone}\n`;
+            txtContent += `إجمالي الزيارات: ${patient.visits.length}\n`;
+            txtContent += `=========================================\n\n`;
+
+            patient.visits.forEach((v, index) => {
+                txtContent += `[زيارة رقم ${index + 1}] - التاريخ: ${v.visit_date || 'غير محدد'}\n`;
+                txtContent += `نوع الزيارة: ${v.visit_type || '-'}\n`;
+                txtContent += `التشخيص: ${v.diagnosis || '-'}\n`;
+                if (v.medication_text) {
+                    txtContent += `الروشتة النصية:\n${v.medication_text}\n`;
+                }
+                txtContent += `-----------------------------------------\n`;
+
+                // نقل المرفقات للمجلد الخاص بالمريض بأسماء واضحة
+                const filesList = [
+                    { file: v.medication_file, label: 'روشتة' },
+                    { file: v.ecg_file, label: 'رسم_قلب' },
+                    { file: v.rays_file, label: 'إيكو_أشعة' },
+                    { file: v.other_rays_file, label: 'أشعات_أخرى' },
+                    { file: v.labs_file, label: 'تحاليل' }
+                ];
+
+                filesList.forEach(item => {
+                    if (item.file) {
+                        const fullPath = path.join(uploadsDir, item.file);
+                        if (fs.existsSync(fullPath)) {
+                            const ext = path.extname(item.file);
+                            const zipFilePath = `${folderName}/${v.visit_date}_${item.label}_ز${v.visit_id}${ext}`;
+                            archive.file(fullPath, { name: zipFilePath });
+                        }
+                    }
+                });
+            });
+
+            // إضافة ملف السجل الطبي المكتوب داخل مجلد المريض
+            archive.append(txtContent, { name: `${folderName}/سجل_الحالة.txt` });
         }
 
         await archive.finalize();
@@ -121,7 +194,7 @@ app.get('/api/backup', async (req, res) => {
             fs.unlinkSync(tempDbPath);
         }
         if (!res.headersSent) {
-            res.status(500).send("حدث خطأ أثناء تنزيل النسخة الاحتياطية الشاملة");
+            res.status(500).send("حدث خطأ أثناء إنشاء النسخة الاحتياطية");
         }
     }
 });
