@@ -43,11 +43,13 @@ if (rawUrl.startsWith("libsql://")) {
     rawUrl = "https://" + rawUrl;
 }
 
+// إنشاء اتصال HTTP مباشر يلغي طلبات Migrations التلقائية
 const db = createClient({
     url: rawUrl,
     authToken: (process.env.TURSO_AUTH_TOKEN || "").trim()
 });
 
+// إنشاء الجداول في حالة عدم وجودها
 async function initDb() {
     try {
         await db.execute(`
@@ -122,14 +124,12 @@ app.post('/api/visit', (req, res, next) => {
 
         let patientId = passedPatientId ? parseInt(passedPatientId) : null;
 
-        // إذا تم تحديد معرف المريض صراحة من القائمة
         if (patientId) {
             await db.execute({
                 sql: 'UPDATE patients SET name = ?, age = ?, phone = ? WHERE id = ?',
                 args: [cleanName, parsedAge, cleanPhone, patientId]
             });
         } else {
-            // البحث عن المريض بالهاتف فقط إذا لم يُحدد معرف المريض
             let existingPatientRes = await db.execute({
                 sql: 'SELECT id FROM patients WHERE phone = ?',
                 args: [cleanPhone]
