@@ -1,286 +1,328 @@
-let globalPatientsData = [];
+require('dotenv').config();
+const express = require('express');
+const { createClient } = require('@libsql/client/http');
+const multer = require('multer');
+const helmet = require('helmet');
+const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const cloudinary = require('cloudinary').v2;
+const archiver = require('archiver');
+const axios = require('axios');
 
-document.addEventListener('DOMContentLoaded', () => {
-    const visitDateInput = document.getElementById('visitDate');
-    if (visitDateInput) visitDateInput.valueAsDate = new Date();
-    loadPatients();
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// إعداد Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-function toggleCustomInput(selectId, divId) {
-    const select = document.getElementById(selectId);
-    const div = document.getElementById(divId);
-    if (select && div) {
-        div.classList.toggle('d-none', select.value !== 'آخر');
-    }
+// الأمان والـ Middlewares
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+// تحديد معدل الطلبات لحماية السيرفر
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    message: { error: 'تم تجاوز حد الطلبات المسموح به، يرجى المحاولة لاحقاً.' }
+});
+app.use('/api/', limiter);
+
+// تخزين مؤقت للملفات في الذاكرة لفحصها قبل الرفع
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // الحد الأقصى 10 ميجابايت للملف
+});
+
+// تجهيز رابط Turso DB
+let rawUrl = (process.env.TURSO_DATABASE_URL || "").trim().replace(/[\r\n]+/g, "");
+if (rawUrl.startsWith("libsql://")) {
+    rawUrl = rawUrl.replace("libsql://", "https://");
+} else if (rawUrl !== "" && !rawUrl.startsWith("https://")) {
+    rawUrl = "https://" + rawUrl;
 }
 
-function toggleMedicationType(type) {
-    const textDiv = document.getElementById('medicationTextDiv');
-    const imageDiv = document.getElementById('medicationImageDiv');
+const db = createClient({
+    url: rawUrl,
+    authToken: (process.env.TURSO_AUTH_TOKEN || "").trim()
+});
 
-    if (type === 'text') {
-        if (textDiv) textDiv.classList.remove('d-none');
-        if (imageDiv) imageDiv.classList.add('d-none');
-        const medImg = document.getElementById('medicationImage');
-        if (medImg) medImg.value = '';
-    } else {
-        if (imageDiv) imageDiv.classList.remove('d-none');
-        if (textDiv) textDiv.classList.add('d-none');
-        const medText = document.getElementById('medicationText');
-        if (medText) medText.value = '';
-    }
-}
-
-function resetForm() {
-    const form = document.getElementById('visitForm');
-    if (form) form.reset();
-    
-    document.getElementById('visitId').value = '';
-    document.getElementById('patientId').value = '';
-    
-    const visitDateInput = document.getElementById('visitDate');
-    if (visitDateInput) visitDateInput.valueAsDate = new Date();
-    
-    document.getElementById('customVisitTypeDiv').classList.add('d-none');
-    document.getElementById('customDiagnosisDiv').classList.add('d-none');
-    
-    toggleMedicationType('text');
-    document.querySelectorAll('input[type="file"]').forEach(input => input.value = '');
-
-    document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-user-plus me-2"></i>تسجيل زيارة جديدة';
-    document.getElementById('resetBtn').classList.add('d-none');
-}
-
-document.getElementById('visitForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const formData = new FormData(e.target);
-
-    // معالجة القيم المخصصة
-    if (formData.get('visitType') === 'آخر') {
-        formData.set('visitType', formData.get('customVisitType'));
-    }
-    if (formData.get('diagnosis') === 'آخر') {
-        formData.set('diagnosis', formData.get('customDiagnosis'));
-    }
-
+// إنشاء الجداول
+async function initDb() {
     try {
-        const res = await fetch('/api/visit', {
-            method: 'POST',
-            body: formData
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS patients (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                age INTEGER,
+                phone TEXT UNIQUE NOT NULL
+            );
+        `);
+
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS visits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER NOT NULL,
+                visit_date TEXT,
+                visit_type TEXT,
+                diagnosis TEXT,
+                medication_type TEXT,
+                medication_text TEXT,
+                medication_file TEXT,
+                has_ecg TEXT DEFAULT 'لا',
+                ecg_file TEXT,
+                has_rays TEXT DEFAULT 'لا',
+                rays_file TEXT,
+                has_other_rays TEXT DEFAULT 'لا',
+                other_rays_file TEXT,
+                has_labs TEXT DEFAULT 'لا',
+                labs_file TEXT,
+                FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE
+            );
+        `);
+        console.log("✅ تم الاتصال بقاعدة بيانات Turso وتجهيز الجداول بنجاح.");
+    } catch (err) {
+        console.error("❌ خطأ قاعدة البيانات:", err.message || err);
+    }
+}
+initDb();
+
+// رفع دالة مساعدة لرفع الملفات إلى Cloudinary
+async function uploadToCloudinary(fileBuffer, folder = 'clinic_uploads') {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder: folder, resource_type: 'auto' },
+            (error, result) => {
+                if (error) return reject(error);
+                resolve(result.secure_url);
+            }
+        );
+        stream.end(fileBuffer);
+    });
+}
+
+// تعريف الحقول المسموح بها في الرفع
+const cpUpload = upload.fields([
+    { name: 'medicationImage', maxCount: 1 },
+    { name: 'ecgFiles', maxCount: 1 },
+    { name: 'echoFiles', maxCount: 1 },
+    { name: 'otherFiles', maxCount: 1 },
+    { name: 'labFiles', maxCount: 1 }
+]);
+
+// 1. حفظ / تعديل زيارة ومريض
+app.post('/api/visit', cpUpload, async (req, res) => {
+    try {
+        const {
+            visitId, patientId: passedPatientId, name, age, phone,
+            visitDate, visitType, customVisitType, diagnosis, customDiagnosis,
+            medicationType, medicationText
+        } = req.body;
+
+        if (!name || !phone) {
+            return res.status(400).json({ error: 'اسم المريض ورقم الهاتف بيانات إجبارية' });
+        }
+
+        const cleanPhone = phone.trim();
+        const cleanName = name.trim();
+        const parsedAge = age ? parseInt(age) : null;
+        
+        const finalVisitType = (visitType === 'آخر' && customVisitType) ? customVisitType.trim() : (visitType || 'كشف');
+        const finalDiagnosis = (diagnosis === 'آخر' && customDiagnosis) ? customDiagnosis.trim() : diagnosis;
+
+        let patientId = passedPatientId ? parseInt(passedPatientId) : null;
+
+        // إدارة المريض
+        if (patientId) {
+            await db.execute({
+                sql: 'UPDATE patients SET name = ?, age = ?, phone = ? WHERE id = ?',
+                args: [cleanName, parsedAge, cleanPhone, patientId]
+            });
+        } else {
+            let existingPatientRes = await db.execute({
+                sql: 'SELECT id FROM patients WHERE phone = ?',
+                args: [cleanPhone]
+            });
+
+            if (existingPatientRes.rows.length > 0) {
+                patientId = existingPatientRes.rows[0].id;
+                await db.execute({
+                    sql: 'UPDATE patients SET name = ?, age = ? WHERE id = ?',
+                    args: [cleanName, parsedAge, patientId]
+                });
+            } else {
+                let insertRes = await db.execute({
+                    sql: 'INSERT INTO patients (name, age, phone) VALUES (?, ?, ?)',
+                    args: [cleanName, parsedAge, cleanPhone]
+                });
+                patientId = Number(insertRes.lastInsertRowid);
+            }
+        }
+
+        // رفع الملفات لـ Cloudinary فقط بعد التأكد من صحة البيانات
+        const files = req.files || {};
+        const medFile = files['medicationImage'] ? await uploadToCloudinary(files['medicationImage'][0].buffer) : null;
+        const ecgFile = files['ecgFiles'] ? await uploadToCloudinary(files['ecgFiles'][0].buffer) : null;
+        const echoFile = files['echoFiles'] ? await uploadToCloudinary(files['echoFiles'][0].buffer) : null;
+        const otherFile = files['otherFiles'] ? await uploadToCloudinary(files['otherFiles'][0].buffer) : null;
+        const labFile = files['labFiles'] ? await uploadToCloudinary(files['labFiles'][0].buffer) : null;
+
+        if (visitId && visitId !== '') {
+            let currentVisitRes = await db.execute({
+                sql: 'SELECT * FROM visits WHERE id = ?',
+                args: [visitId]
+            });
+
+            if (currentVisitRes.rows.length > 0) {
+                const currentVisit = currentVisitRes.rows[0];
+                await db.execute({
+                    sql: `
+                        UPDATE visits SET 
+                            visit_date = ?, visit_type = ?, diagnosis = ?, medication_type = ?, medication_text = ?,
+                            medication_file = ?, has_ecg = ?, ecg_file = ?, has_rays = ?, rays_file = ?,
+                            has_other_rays = ?, other_rays_file = ?, has_labs = ?, labs_file = ?
+                        WHERE id = ?
+                    `,
+                    args: [
+                        visitDate, finalVisitType, finalDiagnosis || '', medicationType || 'text', medicationText || '',
+                        medFile || currentVisit.medication_file, ecgFile ? 'نعم' : currentVisit.has_ecg, ecgFile || currentVisit.ecg_file,
+                        echoFile ? 'نعم' : currentVisit.has_rays, echoFile || currentVisit.rays_file,
+                        otherFile ? 'نعم' : currentVisit.has_other_rays, otherFile || currentVisit.other_rays_file,
+                        labFile ? 'نعم' : currentVisit.has_labs, labFile || currentVisit.labs_file, visitId
+                    ]
+                });
+            }
+        } else {
+            await db.execute({
+                sql: `
+                    INSERT INTO visits (
+                        patient_id, visit_date, visit_type, diagnosis, medication_type, medication_text, 
+                        medication_file, has_ecg, ecg_file, has_rays, rays_file, has_other_rays, 
+                        other_rays_file, has_labs, labs_file
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+                args: [
+                    patientId, visitDate, finalVisitType, finalDiagnosis || '', medicationType || 'text', medicationText || '', 
+                    medFile, ecgFile ? 'نعم' : 'لا', ecgFile, echoFile ? 'نعم' : 'لا', echoFile, 
+                    otherFile ? 'نعم' : 'لا', otherFile, labFile ? 'نعم' : 'لا', labFile
+                ]
+            });
+        }
+
+        res.json({ success: true, message: 'تم حفظ البيانات بنجاح' });
+    } catch (error) {
+        console.error("Save Error:", error);
+        res.status(500).json({ error: error.message || 'حدث خطأ أثناء تنفيذ العملية' });
+    }
+});
+
+// 2. جلب قائمة المرضى وزياراتهم
+app.get('/api/patients', async (req, res) => {
+    try {
+        const query = req.query.q ? `%${req.query.q.trim()}%` : '%';
+        const result = await db.execute({
+            sql: `
+                SELECT p.id, p.name, p.age, p.phone, 
+                       v.id as visit_id, v.visit_date, v.visit_type, v.diagnosis, v.medication_type, 
+                       v.medication_text, v.medication_file, v.has_ecg, v.ecg_file, v.has_rays, v.rays_file,
+                       v.has_other_rays, v.other_rays_file, v.has_labs, v.labs_file
+                FROM patients p
+                LEFT JOIN visits v ON p.id = v.patient_id
+                WHERE p.name LIKE ? OR p.phone LIKE ?
+                ORDER BY p.id DESC, v.visit_date DESC
+            `,
+            args: [query, query]
         });
 
-        const result = await res.json();
+        const patientsMap = {};
+        result.rows.forEach(row => {
+            if (!patientsMap[row.id]) {
+                patientsMap[row.id] = { id: row.id, name: row.name, age: row.age, phone: row.phone, visits: [] };
+            }
+            if (row.visit_id) {
+                patientsMap[row.id].visits.push({
+                    id: row.visit_id, visit_date: row.visit_date, visit_type: row.visit_type, diagnosis: row.diagnosis,
+                    medication_type: row.medication_type, medication_text: row.medication_text,
+                    medication_file: row.medication_file, has_ecg: row.has_ecg, ecg_file: row.ecg_file,
+                    has_rays: row.has_rays, rays_file: row.rays_file,
+                    has_other_rays: row.has_other_rays, other_rays_file: row.other_rays_file,
+                    has_labs: row.has_labs, labs_file: row.labs_file
+                });
+            }
+        });
 
-        if (res.ok) {
-            alert('تم حفظ البيانات بنجاح!');
-            resetForm();
-            loadPatients();
-        } else {
-            alert(`خطأ: ${result.error || 'فشل حفظ البيانات'}`);
-        }
-    } catch (err) {
-        console.error(err);
-        alert('حدث خطأ أثناء الاتصال بالسيرفر.');
+        res.json(Object.values(patientsMap));
+    } catch (error) {
+        console.error("Fetch Error:", error);
+        res.status(500).json({ error: 'خطأ في جلب بيانات المرضى' });
     }
 });
 
-// جلب المرضى باستخدام الكويري الصحيح (q) المتوافق مع backend
-async function loadPatients() {
-    const searchVal = document.getElementById('searchInput').value.trim();
-    const container = document.getElementById('patientsContainer');
-
+// 3. حذف مريض
+app.delete('/api/patient/:id', async (req, res) => {
     try {
-        // تم التغيير إلى q= ليطابق Backend
-        const res = await fetch(`/api/patients?q=${encodeURIComponent(searchVal)}`);
-        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-        
-        globalPatientsData = await res.json();
-
-        if (!globalPatientsData || globalPatientsData.length === 0) {
-            container.innerHTML = `
-                <div class="text-center text-muted my-5">
-                    <i class="fa-solid fa-folder-open fa-3x mb-3"></i>
-                    <p>لا توجد نتائج للعرض</p>
-                </div>`;
-            return;
-        }
-
-        container.innerHTML = globalPatientsData.map(p => renderPatientCard(p)).join('');
-    } catch (err) {
-        console.error('Error loading patients:', err);
-        container.innerHTML = `<div class="alert alert-danger text-center">حدث خطأ في جلب البيانات من السيرفر.</div>`;
+        await db.execute({ sql: 'DELETE FROM patients WHERE id = ?', args: [req.params.id] });
+        res.json({ success: true, message: 'تم حذف سجل المريض بنجاح' });
+    } catch (error) {
+        res.status(500).json({ error: 'حدث خطأ أثناء عملية الحذف' });
     }
-}
+});
 
-function renderPatientCard(patient) {
-    const visits = patient.visits || [];
-
-    return `
-        <div class="card patient-card border-0 mb-3">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-3">
-                    <div>
-                        <h5 class="fw-bold text-dark mb-1">${escapeHTML(patient.name)}</h5>
-                        <div class="text-muted small">
-                            <span class="me-3"><i class="fa-solid fa-phone me-1"></i>${escapeHTML(patient.phone)}</span>
-                            ${patient.age ? `<span><i class="fa-solid fa-cake-candles me-1"></i>${patient.age} سنة</span>` : ''}
-                        </div>
-                    </div>
-                    <span class="badge bg-primary-subtle text-primary badge-custom">
-                        ${visits.length} زيارات
-                    </span>
-                </div>
-
-                <div class="accordion accordion-flush" id="accordion-${patient.id}">
-                    ${visits.map((v, index) => renderVisitItem(v, patient, index)).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function renderVisitItem(visit, patient, index) {
-    const accordionId = `visit-${patient.id}-${index}`;
-    
-    return `
-        <div class="accordion-item border-0 bg-light rounded mb-2">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed bg-light rounded" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionId}">
-                    <div class="d-flex justify-content-between w-100 me-3 align-items-center">
-                        <span class="fw-bold"><i class="fa-regular fa-calendar-check me-2 text-primary"></i>${visit.visit_date || ''}</span>
-                        <span class="badge bg-secondary-subtle text-secondary me-2">${escapeHTML(visit.visit_type)}</span>
-                        <span class="text-muted small">${escapeHTML(visit.diagnosis)}</span>
-                    </div>
-                </button>
-            </h2>
-            <div id="${accordionId}" class="accordion-collapse collapse" data-bs-parent="#accordion-${patient.id}">
-                <div class="accordion-body bg-white border-top">
-                    
-                    <div class="d-flex justify-content-end mb-2">
-                        <button class="btn btn-sm btn-outline-primary border-0 me-1" 
-                            onclick="triggerEdit(${patient.id}, ${visit.id})" 
-                            title="تعديل الزيارة">
-                            <i class="fa-solid fa-pen me-1"></i>تعديل
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger border-0" 
-                            onclick="deleteVisit(${visit.id})" 
-                            title="حذف الزيارة">
-                            <i class="fa-solid fa-trash me-1"></i>حذف
-                        </button>
-                    </div>
-
-                    <div class="mb-3">
-                        <strong class="d-block text-muted small mb-1">الروشتة / العلاج:</strong>
-                        ${visit.medication_text ? `<p class="mb-0 bg-light p-2 rounded text-dark">${escapeHTML(visit.medication_text)}</p>` : ''}
-                        ${visit.medication_file ? `<a href="${visit.medication_file}" target="_blank" class="btn btn-sm btn-outline-secondary mt-1"><i class="fa-solid fa-image me-1"></i>عرض صورة الروشتة</a>` : ''}
-                    </div>
-
-                    ${renderAttachments(visit)}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// عرض المرفقات بناءً على الهيكلية الصحيحة في Backend
-function renderAttachments(visit) {
-    const categories = [
-        { key: 'ecg_file', title: 'رسم قلب (ECG)', icon: 'fa-wave-square text-danger' },
-        { key: 'rays_file', title: 'إيكو (Echo)', icon: 'fa-ultrasound text-primary' },
-        { key: 'other_rays_file', title: 'أشعة أخرى', icon: 'fa-box-archive text-secondary' },
-        { key: 'labs_file', title: 'تحاليل (Labs)', icon: 'fa-vial text-warning' }
-    ];
-
-    let html = '';
-    categories.forEach(cat => {
-        if (visit[cat.key]) {
-            html += `
-                <div class="mt-2">
-                    <strong class="d-block text-muted small mb-1"><i class="fa-solid ${cat.icon} me-1"></i>${cat.title}:</strong>
-                    <a href="${visit[cat.key]}" target="_blank" class="btn btn-sm btn-light border text-truncate" style="max-width: 250px;">
-                        <i class="fa-solid fa-file me-1"></i>عرض الملف المرفق
-                    </a>
-                </div>
-            `;
-        }
-    });
-
-    return html;
-}
-
-function triggerEdit(patientId, visitId) {
-    const patient = globalPatientsData.find(p => p.id === patientId);
-    if (!patient) return;
-
-    const visit = patient.visits.find(v => v.id === visitId);
-    if (!visit) return;
-
-    document.getElementById('visitId').value = visit.id || '';
-    document.getElementById('patientId').value = patient.id || '';
-    document.getElementById('name').value = patient.name || '';
-    document.getElementById('phone').value = patient.phone || '';
-    document.getElementById('age').value = patient.age || '';
-    document.getElementById('visitDate').value = visit.visit_date || '';
-
-    const visitTypeSelect = document.getElementById('visitType');
-    if (['كشف', 'استشارة', 'متابعة'].includes(visit.visit_type)) {
-        visitTypeSelect.value = visit.visit_type;
-        document.getElementById('customVisitTypeDiv').classList.add('d-none');
-    } else {
-        visitTypeSelect.value = 'آخر';
-        document.getElementById('customVisitTypeDiv').classList.remove('d-none');
-        document.getElementById('customVisitType').value = visit.visit_type || '';
-    }
-
-    const diagnosisSelect = document.getElementById('diagnosis');
-    if (['ارتفاع ضغط الدم', 'قصور بالشرايين التاجية', 'ضعف بعضلة القلب'].includes(visit.diagnosis)) {
-        diagnosisSelect.value = visit.diagnosis;
-        document.getElementById('customDiagnosisDiv').classList.add('d-none');
-    } else {
-        diagnosisSelect.value = 'آخر';
-        document.getElementById('customDiagnosisDiv').classList.remove('d-none');
-        document.getElementById('customDiagnosis').value = visit.diagnosis || '';
-    }
-
-    if (visit.medication_text) {
-        document.getElementById('medTextRadio').checked = true;
-        toggleMedicationType('text');
-        document.getElementById('medicationText').value = visit.medication_text;
-    } else if (visit.medication_file) {
-        document.getElementById('medImageRadio').checked = true;
-        toggleMedicationType('image');
-    }
-
-    document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-pen-to-square me-2"></i>تعديل بيانات زيارة';
-    document.getElementById('resetBtn').classList.remove('d-none');
-
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-async function deleteVisit(visitId) {
-    if (!confirm('هل أنت تأكد من رغبتك في حذف هذه الزيارة؟')) return;
-
+// 4. حذف زيارة
+app.delete('/api/visit/:id', async (req, res) => {
     try {
-        const res = await fetch(`/api/visit/${visitId}`, { method: 'DELETE' });
-        if (res.ok) {
-            loadPatients();
-        } else {
-            const result = await res.json();
-            alert(`خطأ: ${result.error || 'فشل حذف الزيارة'}`);
-        }
-    } catch (err) {
-        console.error(err);
-        alert('حدث خطأ أثناء الاتصال بالسيرفر.');
+        await db.execute({ sql: 'DELETE FROM visits WHERE id = ?', args: [req.params.id] });
+        res.json({ success: true, message: 'تم حذف الزيارة بنجاح' });
+    } catch (error) {
+        res.status(500).json({ error: 'حدث خطأ أثناء حذف الزيارة' });
     }
-}
+});
 
-function escapeHTML(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
+// 5. ميزة تنزيل النسخة الاحتياطية بالكامل على جهاز الكمبيوتر (Backup ZIP)
+app.get('/api/export-backup', async (req, res) => {
+    try {
+        const patientsRes = await db.execute('SELECT * FROM patients');
+        const visitsRes = await db.execute('SELECT * FROM visits');
+
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        res.attachment(`clinic_backup_${new Date().toISOString().split('T')[0]}.zip`);
+        archive.pipe(res);
+
+        // إرفاق ملف البيانات
+        const databaseData = JSON.stringify({ patients: patientsRes.rows, visits: visitsRes.rows }, null, 2);
+        archive.append(databaseData, { name: 'database_backup.json' });
+
+        // تجميع المستندات والصور
+        const fileUrls = [];
+        visitsRes.rows.forEach(v => {
+            ['medication_file', 'ecg_file', 'rays_file', 'other_rays_file', 'labs_file'].forEach(key => {
+                if (v[key]) fileUrls.push(v[key]);
+            });
+        });
+
+        for (let i = 0; i < fileUrls.length; i++) {
+            const url = fileUrls[i];
+            try {
+                const response = await axios.get(url, { responseType: 'arraybuffer' });
+                const fileName = `attachments/file_${i + 1}_${url.split('/').pop()}`;
+                archive.append(Buffer.from(response.data), { name: fileName });
+            } catch (e) {
+                console.error(`Failed to download file for backup: ${url}`);
+            }
+        }
+
+        await archive.finalize();
+    } catch (error) {
+        console.error("Backup Error:", error);
+        res.status(500).send("خطأ أثناء إنشاء النسخة الاحتياطية");
+    }
+});
+
+app.listen(PORT, () => {
+    console.log(`✅ سيرفر العيادة يعمل بنجاح على البورت: ${PORT}`);
+});
