@@ -1,265 +1,286 @@
-require('dotenv').config();
-const express = require('express');
-const { createClient } = require('@libsql/client/http');
-const multer = require('multer');
-const helmet = require('helmet');
-const cors = require('cors');
-const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+let globalPatientsData = [];
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// إعداد Cloudinary
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
+document.addEventListener('DOMContentLoaded', () => {
+    const visitDateInput = document.getElementById('visitDate');
+    if (visitDateInput) visitDateInput.valueAsDate = new Date();
+    loadPatients();
 });
 
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'clinic_uploads',
-        resource_type: 'auto'
+function toggleCustomInput(selectId, divId) {
+    const select = document.getElementById(selectId);
+    const div = document.getElementById(divId);
+    if (select && div) {
+        div.classList.toggle('d-none', select.value !== 'آخر');
     }
-});
-
-const upload = multer({
-    storage,
-    limits: { fileSize: 10 * 1024 * 1024 }
-});
-
-// معالجة رابط قاعدة البيانات
-let rawUrl = (process.env.TURSO_DATABASE_URL || "").trim().replace(/[\r\n]+/g, "");
-if (rawUrl.startsWith("libsql://")) {
-    rawUrl = rawUrl.replace("libsql://", "https://");
-} else if (rawUrl !== "" && !rawUrl.startsWith("https://")) {
-    rawUrl = "https://" + rawUrl;
 }
 
-const db = createClient({
-    url: rawUrl,
-    authToken: (process.env.TURSO_AUTH_TOKEN || "").trim()
-});
+function toggleMedicationType(type) {
+    const textDiv = document.getElementById('medicationTextDiv');
+    const imageDiv = document.getElementById('medicationImageDiv');
 
-async function initDb() {
+    if (type === 'text') {
+        if (textDiv) textDiv.classList.remove('d-none');
+        if (imageDiv) imageDiv.classList.add('d-none');
+        const medImg = document.getElementById('medicationImage');
+        if (medImg) medImg.value = '';
+    } else {
+        if (imageDiv) imageDiv.classList.remove('d-none');
+        if (textDiv) textDiv.classList.add('d-none');
+        const medText = document.getElementById('medicationText');
+        if (medText) medText.value = '';
+    }
+}
+
+function resetForm() {
+    const form = document.getElementById('visitForm');
+    if (form) form.reset();
+    
+    document.getElementById('visitId').value = '';
+    document.getElementById('patientId').value = '';
+    
+    const visitDateInput = document.getElementById('visitDate');
+    if (visitDateInput) visitDateInput.valueAsDate = new Date();
+    
+    document.getElementById('customVisitTypeDiv').classList.add('d-none');
+    document.getElementById('customDiagnosisDiv').classList.add('d-none');
+    
+    toggleMedicationType('text');
+    document.querySelectorAll('input[type="file"]').forEach(input => input.value = '');
+
+    document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-user-plus me-2"></i>تسجيل زيارة جديدة';
+    document.getElementById('resetBtn').classList.add('d-none');
+}
+
+document.getElementById('visitForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(e.target);
+
+    // معالجة القيم المخصصة
+    if (formData.get('visitType') === 'آخر') {
+        formData.set('visitType', formData.get('customVisitType'));
+    }
+    if (formData.get('diagnosis') === 'آخر') {
+        formData.set('diagnosis', formData.get('customDiagnosis'));
+    }
+
     try {
-        await db.execute(`
-            CREATE TABLE IF NOT EXISTS patients (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                age INTEGER,
-                phone TEXT UNIQUE NOT NULL
-            );
-        `);
+        const res = await fetch('/api/visit', {
+            method: 'POST',
+            body: formData
+        });
 
-        await db.execute(`
-            CREATE TABLE IF NOT EXISTS visits (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                patient_id INTEGER NOT NULL,
-                visit_date TEXT,
-                visit_type TEXT,
-                diagnosis TEXT,
-                medication_type TEXT,
-                medication_text TEXT,
-                medication_file TEXT,
-                has_ecg TEXT DEFAULT 'لا',
-                ecg_file TEXT,
-                has_rays TEXT DEFAULT 'لا',
-                rays_file TEXT,
-                has_other_rays TEXT DEFAULT 'لا',
-                other_rays_file TEXT,
-                has_labs TEXT DEFAULT 'لا',
-                labs_file TEXT,
-                FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE
-            );
-        `);
-        console.log("✅ تم الاتصال بقاعدة بيانات Turso وتجهيز الجداول بنجاح.");
+        const result = await res.json();
+
+        if (res.ok) {
+            alert('تم حفظ البيانات بنجاح!');
+            resetForm();
+            loadPatients();
+        } else {
+            alert(`خطأ: ${result.error || 'فشل حفظ البيانات'}`);
+        }
     } catch (err) {
-        console.error("❌ خطأ قاعدة البيانات:", err.message || err);
+        console.error(err);
+        alert('حدث خطأ أثناء الاتصال بالسيرفر.');
+    }
+});
+
+// جلب المرضى باستخدام الكويري الصحيح (q) المتوافق مع backend
+async function loadPatients() {
+    const searchVal = document.getElementById('searchInput').value.trim();
+    const container = document.getElementById('patientsContainer');
+
+    try {
+        // تم التغيير إلى q= ليطابق Backend
+        const res = await fetch(`/api/patients?q=${encodeURIComponent(searchVal)}`);
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        
+        globalPatientsData = await res.json();
+
+        if (!globalPatientsData || globalPatientsData.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted my-5">
+                    <i class="fa-solid fa-folder-open fa-3x mb-3"></i>
+                    <p>لا توجد نتائج للعرض</p>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = globalPatientsData.map(p => renderPatientCard(p)).join('');
+    } catch (err) {
+        console.error('Error loading patients:', err);
+        container.innerHTML = `<div class="alert alert-danger text-center">حدث خطأ في جلب البيانات من السيرفر.</div>`;
     }
 }
-initDb();
 
-const cpUpload = upload.fields([
-    { name: 'medicationFile', maxCount: 1 },
-    { name: 'ecgFile', maxCount: 1 },
-    { name: 'raysFile', maxCount: 1 },
-    { name: 'otherRaysFile', maxCount: 1 },
-    { name: 'labsFile', maxCount: 1 }
-]);
+function renderPatientCard(patient) {
+    const visits = patient.visits || [];
 
-// حفظ / تعديل زيارة ومريض
-app.post('/api/visit', (req, res, next) => {
-    cpUpload(req, res, (err) => {
-        if (err) return res.status(400).json({ error: err.message });
-        next();
+    return `
+        <div class="card patient-card border-0 mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-3">
+                    <div>
+                        <h5 class="fw-bold text-dark mb-1">${escapeHTML(patient.name)}</h5>
+                        <div class="text-muted small">
+                            <span class="me-3"><i class="fa-solid fa-phone me-1"></i>${escapeHTML(patient.phone)}</span>
+                            ${patient.age ? `<span><i class="fa-solid fa-cake-candles me-1"></i>${patient.age} سنة</span>` : ''}
+                        </div>
+                    </div>
+                    <span class="badge bg-primary-subtle text-primary badge-custom">
+                        ${visits.length} زيارات
+                    </span>
+                </div>
+
+                <div class="accordion accordion-flush" id="accordion-${patient.id}">
+                    ${visits.map((v, index) => renderVisitItem(v, patient, index)).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderVisitItem(visit, patient, index) {
+    const accordionId = `visit-${patient.id}-${index}`;
+    
+    return `
+        <div class="accordion-item border-0 bg-light rounded mb-2">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed bg-light rounded" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionId}">
+                    <div class="d-flex justify-content-between w-100 me-3 align-items-center">
+                        <span class="fw-bold"><i class="fa-regular fa-calendar-check me-2 text-primary"></i>${visit.visit_date || ''}</span>
+                        <span class="badge bg-secondary-subtle text-secondary me-2">${escapeHTML(visit.visit_type)}</span>
+                        <span class="text-muted small">${escapeHTML(visit.diagnosis)}</span>
+                    </div>
+                </button>
+            </h2>
+            <div id="${accordionId}" class="accordion-collapse collapse" data-bs-parent="#accordion-${patient.id}">
+                <div class="accordion-body bg-white border-top">
+                    
+                    <div class="d-flex justify-content-end mb-2">
+                        <button class="btn btn-sm btn-outline-primary border-0 me-1" 
+                            onclick="triggerEdit(${patient.id}, ${visit.id})" 
+                            title="تعديل الزيارة">
+                            <i class="fa-solid fa-pen me-1"></i>تعديل
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger border-0" 
+                            onclick="deleteVisit(${visit.id})" 
+                            title="حذف الزيارة">
+                            <i class="fa-solid fa-trash me-1"></i>حذف
+                        </button>
+                    </div>
+
+                    <div class="mb-3">
+                        <strong class="d-block text-muted small mb-1">الروشتة / العلاج:</strong>
+                        ${visit.medication_text ? `<p class="mb-0 bg-light p-2 rounded text-dark">${escapeHTML(visit.medication_text)}</p>` : ''}
+                        ${visit.medication_file ? `<a href="${visit.medication_file}" target="_blank" class="btn btn-sm btn-outline-secondary mt-1"><i class="fa-solid fa-image me-1"></i>عرض صورة الروشتة</a>` : ''}
+                    </div>
+
+                    ${renderAttachments(visit)}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// عرض المرفقات بناءً على الهيكلية الصحيحة في Backend
+function renderAttachments(visit) {
+    const categories = [
+        { key: 'ecg_file', title: 'رسم قلب (ECG)', icon: 'fa-wave-square text-danger' },
+        { key: 'rays_file', title: 'إيكو (Echo)', icon: 'fa-ultrasound text-primary' },
+        { key: 'other_rays_file', title: 'أشعة أخرى', icon: 'fa-box-archive text-secondary' },
+        { key: 'labs_file', title: 'تحاليل (Labs)', icon: 'fa-vial text-warning' }
+    ];
+
+    let html = '';
+    categories.forEach(cat => {
+        if (visit[cat.key]) {
+            html += `
+                <div class="mt-2">
+                    <strong class="d-block text-muted small mb-1"><i class="fa-solid ${cat.icon} me-1"></i>${cat.title}:</strong>
+                    <a href="${visit[cat.key]}" target="_blank" class="btn btn-sm btn-light border text-truncate" style="max-width: 250px;">
+                        <i class="fa-solid fa-file me-1"></i>عرض الملف المرفق
+                    </a>
+                </div>
+            `;
+        }
     });
-}, async (req, res) => {
+
+    return html;
+}
+
+function triggerEdit(patientId, visitId) {
+    const patient = globalPatientsData.find(p => p.id === patientId);
+    if (!patient) return;
+
+    const visit = patient.visits.find(v => v.id === visitId);
+    if (!visit) return;
+
+    document.getElementById('visitId').value = visit.id || '';
+    document.getElementById('patientId').value = patient.id || '';
+    document.getElementById('name').value = patient.name || '';
+    document.getElementById('phone').value = patient.phone || '';
+    document.getElementById('age').value = patient.age || '';
+    document.getElementById('visitDate').value = visit.visit_date || '';
+
+    const visitTypeSelect = document.getElementById('visitType');
+    if (['كشف', 'استشارة', 'متابعة'].includes(visit.visit_type)) {
+        visitTypeSelect.value = visit.visit_type;
+        document.getElementById('customVisitTypeDiv').classList.add('d-none');
+    } else {
+        visitTypeSelect.value = 'آخر';
+        document.getElementById('customVisitTypeDiv').classList.remove('d-none');
+        document.getElementById('customVisitType').value = visit.visit_type || '';
+    }
+
+    const diagnosisSelect = document.getElementById('diagnosis');
+    if (['ارتفاع ضغط الدم', 'قصور بالشرايين التاجية', 'ضعف بعضلة القلب'].includes(visit.diagnosis)) {
+        diagnosisSelect.value = visit.diagnosis;
+        document.getElementById('customDiagnosisDiv').classList.add('d-none');
+    } else {
+        diagnosisSelect.value = 'آخر';
+        document.getElementById('customDiagnosisDiv').classList.remove('d-none');
+        document.getElementById('customDiagnosis').value = visit.diagnosis || '';
+    }
+
+    if (visit.medication_text) {
+        document.getElementById('medTextRadio').checked = true;
+        toggleMedicationType('text');
+        document.getElementById('medicationText').value = visit.medication_text;
+    } else if (visit.medication_file) {
+        document.getElementById('medImageRadio').checked = true;
+        toggleMedicationType('image');
+    }
+
+    document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-pen-to-square me-2"></i>تعديل بيانات زيارة';
+    document.getElementById('resetBtn').classList.remove('d-none');
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteVisit(visitId) {
+    if (!confirm('هل أنت تأكد من رغبتك في حذف هذه الزيارة؟')) return;
+
     try {
-        const {
-            visitId, patientId: passedPatientId, name, age, phone,
-            visitDate, visitType, customVisitType, diagnosis, customDiagnosis,
-            medicationType, medicationText, hasEcg, hasRays, hasOtherRays, hasLabs
-        } = req.body;
-
-        if (!name || !phone) {
-            return res.status(400).json({ error: 'اسم المريض ورقم الهاتف بيانات إجبارية' });
-        }
-
-        const cleanPhone = phone.trim();
-        const cleanName = name.trim();
-        const parsedAge = age ? parseInt(age) : null;
-        
-        const finalVisitType = (visitType === 'آخر' && customVisitType) ? customVisitType.trim() : (visitType || 'كشف');
-        const finalDiagnosis = (diagnosis === 'آخر' && customDiagnosis) ? customDiagnosis.trim() : diagnosis;
-
-        let patientId = passedPatientId ? parseInt(passedPatientId) : null;
-
-        // إذا تم تحديد معرف المريض صراحة من القائمة
-        if (patientId) {
-            await db.execute({
-                sql: 'UPDATE patients SET name = ?, age = ?, phone = ? WHERE id = ?',
-                args: [cleanName, parsedAge, cleanPhone, patientId]
-            });
+        const res = await fetch(`/api/visit/${visitId}`, { method: 'DELETE' });
+        if (res.ok) {
+            loadPatients();
         } else {
-            // البحث عن المريض بالهاتف فقط إذا لم يُحدد معرف المريض
-            let existingPatientRes = await db.execute({
-                sql: 'SELECT id FROM patients WHERE phone = ?',
-                args: [cleanPhone]
-            });
-
-            if (existingPatientRes.rows.length > 0) {
-                patientId = existingPatientRes.rows[0].id;
-                await db.execute({
-                    sql: 'UPDATE patients SET name = ?, age = ? WHERE id = ?',
-                    args: [cleanName, parsedAge, patientId]
-                });
-            } else {
-                let insertRes = await db.execute({
-                    sql: 'INSERT INTO patients (name, age, phone) VALUES (?, ?, ?)',
-                    args: [cleanName, parsedAge, cleanPhone]
-                });
-                patientId = Number(insertRes.lastInsertRowid);
-            }
+            const result = await res.json();
+            alert(`خطأ: ${result.error || 'فشل حذف الزيارة'}`);
         }
-
-        const medFile = req.files?.['medicationFile']?.[0]?.path || null;
-        const ecgFile = req.files?.['ecgFile']?.[0]?.path || null;
-        const raysFile = req.files?.['raysFile']?.[0]?.path || null;
-        const otherRaysFile = req.files?.['otherRaysFile']?.[0]?.path || null;
-        const labsFile = req.files?.['labsFile']?.[0]?.path || null;
-
-        if (visitId && visitId !== '') {
-            let currentVisitRes = await db.execute({
-                sql: 'SELECT * FROM visits WHERE id = ?',
-                args: [visitId]
-            });
-
-            if (currentVisitRes.rows.length > 0) {
-                const currentVisit = currentVisitRes.rows[0];
-                await db.execute({
-                    sql: `
-                        UPDATE visits SET 
-                            visit_date = ?, visit_type = ?, diagnosis = ?, medication_type = ?, medication_text = ?,
-                            medication_file = ?, has_ecg = ?, ecg_file = ?, has_rays = ?, rays_file = ?,
-                            has_other_rays = ?, other_rays_file = ?, has_labs = ?, labs_file = ?
-                        WHERE id = ?
-                    `,
-                    args: [
-                        visitDate, finalVisitType, finalDiagnosis || '', medicationType || 'text', medicationText || '',
-                        medFile || currentVisit.medication_file, hasEcg || 'لا', ecgFile || currentVisit.ecg_file,
-                        hasRays || 'لا', raysFile || currentVisit.rays_file,
-                        hasOtherRays || 'لا', otherRaysFile || currentVisit.other_rays_file,
-                        hasLabs || 'لا', labsFile || currentVisit.labs_file, visitId
-                    ]
-                });
-            }
-        } else {
-            await db.execute({
-                sql: `
-                    INSERT INTO visits (patient_id, visit_date, visit_type, diagnosis, medication_type, medication_text, medication_file, has_ecg, ecg_file, has_rays, rays_file, has_other_rays, other_rays_file, has_labs, labs_file)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                `,
-                args: [patientId, visitDate, finalVisitType, finalDiagnosis || '', medicationType || 'text', medicationText || '', medFile, hasEcg || 'لا', ecgFile, hasRays || 'لا', raysFile, hasOtherRays || 'لا', otherRaysFile, hasLabs || 'لا', labsFile]
-            });
-        }
-
-        res.json({ success: true, message: 'تم حفظ البيانات بنجاح' });
-    } catch (error) {
-        console.error("Save Error:", error);
-        res.status(400).json({ error: error.message || 'حدث خطأ أثناء تنفيذ العملية' });
+    } catch (err) {
+        console.error(err);
+        alert('حدث خطأ أثناء الاتصال بالسيرفر.');
     }
-});
+}
 
-// جلب قائمة المرضى وزياراتهم
-app.get('/api/patients', async (req, res) => {
-    try {
-        const query = req.query.q ? `%${req.query.q.trim()}%` : '%';
-        const result = await db.execute({
-            sql: `
-                SELECT p.id, p.name, p.age, p.phone, 
-                       v.id as visit_id, v.visit_date, v.visit_type, v.diagnosis, v.medication_type, 
-                       v.medication_text, v.medication_file, v.has_ecg, v.ecg_file, v.has_rays, v.rays_file,
-                       v.has_other_rays, v.other_rays_file, v.has_labs, v.labs_file
-                FROM patients p
-                LEFT JOIN visits v ON p.id = v.patient_id
-                WHERE p.name LIKE ? OR p.phone LIKE ?
-                ORDER BY p.id DESC, v.visit_date DESC
-            `,
-            args: [query, query]
-        });
-
-        const patientsMap = {};
-        result.rows.forEach(row => {
-            if (!patientsMap[row.id]) {
-                patientsMap[row.id] = { id: row.id, name: row.name, age: row.age, phone: row.phone, visits: [] };
-            }
-            if (row.visit_id) {
-                patientsMap[row.id].visits.push({
-                    id: row.visit_id, visit_date: row.visit_date, visit_type: row.visit_type, diagnosis: row.diagnosis,
-                    medication_type: row.medication_type, medication_text: row.medication_text,
-                    medication_file: row.medication_file, has_ecg: row.has_ecg, ecg_file: row.ecg_file,
-                    has_rays: row.has_rays, rays_file: row.rays_file,
-                    has_other_rays: row.has_other_rays, other_rays_file: row.other_rays_file,
-                    has_labs: row.has_labs, labs_file: row.labs_file
-                });
-            }
-        });
-
-        res.json(Object.values(patientsMap));
-    } catch (error) {
-        console.error("Fetch Error:", error);
-        res.status(500).json({ error: 'خطأ في جلب بيانات المرضى' });
-    }
-});
-
-// حذف مريض
-app.delete('/api/patient/:id', async (req, res) => {
-    try {
-        await db.execute({ sql: 'DELETE FROM patients WHERE id = ?', args: [req.params.id] });
-        res.json({ success: true, message: 'تم حذف سجل المريض بنجاح' });
-    } catch (error) {
-        res.status(500).json({ error: 'حدث خطأ أثناء عملية الحذف' });
-    }
-});
-
-// حذف زيارة
-app.delete('/api/visit/:id', async (req, res) => {
-    try {
-        await db.execute({ sql: 'DELETE FROM visits WHERE id = ?', args: [req.params.id] });
-        res.json({ success: true, message: 'تم حذف الزيارة بنجاح' });
-    } catch (error) {
-        res.status(500).json({ error: 'حدث خطأ أثناء حذف الزيارة' });
-    }
-});
-
-app.listen(PORT, () => {
-    console.log(`✅ سيرفر العيادة يعمل بنجاح على البورت: ${PORT}`);
-});
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
