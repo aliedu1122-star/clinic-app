@@ -10,220 +10,103 @@
             --secondary-color: #6c757d;
             --bg-color: #f8f9fa;
             --card-bg: #ffffff;
-            --text-color: #212529;
             --border-color: #dee2e6;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        }
-
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            padding: 20px;
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid var(--border-color);
-        }
-
-        nav {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .nav-btn {
-            flex: 1;
-            padding: 12px;
-            border: 1px solid var(--border-color);
-            background: var(--card-bg);
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 6px;
-            transition: all 0.2s;
-        }
-
-        .nav-btn.active {
-            background-color: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
-
-        .tab-content {
-            display: none;
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 600;
-        }
-
-        input[type="text"],
-        input[type="tel"],
-        input[type="date"],
-        textarea,
-        select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 15px;
-        }
-
-        button.btn-submit,
-        button.btn-action {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            font-size: 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            width: 100%;
-            font-weight: bold;
-        }
-
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .search-box {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .search-box input {
-            flex: 1;
-        }
-
-        .search-box button {
-            width: auto;
-            padding: 0 25px;
-        }
-
-        .result-card {
-            border: 1px solid var(--border-color);
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 12px;
-            background-color: #fafafa;
-        }
-
-        .result-card h3 {
-            color: var(--primary-color);
-            margin-bottom: 8px;
-        }
-
-        .result-card p {
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-
-        .file-link {
-            display: inline-block;
-            margin-top: 8px;
-            color: var(--primary-color);
-            text-decoration: none;
-            font-weight: bold;
-        }
-
-        .file-link:hover {
-            text-decoration: underline;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+        body { background-color: var(--bg-color); padding: 20px; max-width: 900px; margin: 0 auto; }
+        header { text-align: center; margin-bottom: 20px; }
+        nav { display: flex; gap: 10px; margin-bottom: 20px; }
+        .nav-btn { flex: 1; padding: 12px; border: 1px solid var(--border-color); background: var(--card-bg); cursor: pointer; font-size: 16px; font-weight: bold; border-radius: 6px; }
+        .nav-btn.active { background-color: var(--primary-color); color: white; }
+        .tab-content { display: none; background: var(--card-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .tab-content.active { display: block; }
+        .form-group { margin-bottom: 15px; }
+        .section-title { font-size: 16px; font-weight: bold; color: var(--primary-color); margin: 20px 0 10px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; }
+        button.btn-submit { background-color: var(--primary-color); color: white; border: none; padding: 12px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        .result-card { border: 1px solid var(--border-color); padding: 15px; border-radius: 6px; margin-bottom: 12px; background: #fafafa; }
+        .file-link { display: inline-block; padding: 6px 12px; background: #e9ecef; color: var(--primary-color); text-decoration: none; font-weight: bold; border-radius: 4px; margin-top: 5px; margin-left: 5px; }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>نظام إدارة العيادة</h1>
-    </header>
+    <header><h1>نظام إدارة العيادة</h1></header>
 
     <nav>
         <button class="nav-btn active" data-tab="new-booking">حجز جديد / حالة</button>
-        <button class="nav-btn" data-tab="search">البحث والجلوس</button>
-        <button class="nav-btn" data-tab="settings">الإعدادات والنسخ الاحتياطي</button>
+        <button class="nav-btn" data-tab="search">البحث</button>
+        <button class="nav-btn" data-tab="settings">النسخ الاحتياطي</button>
     </nav>
 
     <!-- تبويب حجز جديد -->
     <section id="new-booking" class="tab-content active">
         <form id="booking-form">
             <div class="form-group">
-                <label for="patient_name">اسم المريض:</label>
-                <input type="text" id="patient_name" name="patient_name" required placeholder="أدخل اسم المريض">
+                <label>اسم المريض:</label>
+                <input type="text" name="patient_name" required>
+            </div>
+            <div class="form-group">
+                <label>رقم الهاتف:</label>
+                <input type="tel" name="phone">
+            </div>
+            <div class="form-group">
+                <label>تاريخ الموعد:</label>
+                <input type="date" name="appointment_date">
+            </div>
+            <div class="form-group">
+                <label>التشخيص (كتابة نصية):</label>
+                <textarea name="diagnosis" rows="3"></textarea>
+            </div>
+
+            <div class="section-title">الروشتة (نصية / صورة)</div>
+            <div class="form-group">
+                <label>نص الروشتة:</label>
+                <textarea name="prescription_text" rows="3" placeholder="اكتب الأدوية هنا..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>صورة الروشتة (اختياري):</label>
+                <input type="file" name="prescription_file" accept="image/*">
+            </div>
+
+            <div class="section-title">الفحوصات والمرفقات</div>
+            <div class="form-group">
+                <label>صورة رسم قلب (ECG):</label>
+                <input type="file" name="ecg_file" accept="image/*">
+            </div>
+            <div class="form-group">
+                <label>صورة إيكو (Echo):</label>
+                <input type="file" name="echo_file" accept="image/*">
+            </div>
+            <div class="form-group">
+                <label>صورة أشعة (X-Ray):</label>
+                <input type="file" name="xray_file" accept="image/*">
             </div>
 
             <div class="form-group">
-                <label for="phone">رقم الهاتف:</label>
-                <input type="tel" id="phone" name="phone" placeholder="01xxxxxxxx">
+                <label>ملاحظات إضافية:</label>
+                <textarea name="notes" rows="2"></textarea>
             </div>
 
-            <div class="form-group">
-                <label for="appointment_date">تاريخ الموعد:</label>
-                <input type="date" id="appointment_date" name="appointment_date">
-            </div>
-
-            <div class="form-group">
-                <label for="diagnosis">التشخيص (كتابة نصية):</label>
-                <textarea id="diagnosis" name="diagnosis" rows="3" placeholder="اكتب التشخيص التفصيلي هنا..."></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="notes">ملاحظات إضافية:</label>
-                <textarea id="notes" name="notes" rows="2" placeholder="أي ملاحظات أخرى..."></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="attachment">ارفاق ملف (صورة / اشعة / مستند):</label>
-                <input type="file" id="attachment" name="attachment">
-            </div>
-
-            <button type="submit" class="btn-submit">حفظ الحجز / البيانات</button>
+            <button type="submit" class="btn-submit">حفظ الحالة بالكامل</button>
         </form>
     </section>
 
     <!-- تبويب البحث -->
     <section id="search" class="tab-content">
-        <div class="search-box">
-            <input type="text" id="search-input" placeholder="ابحث باسم المريض، رقم الهاتف، أو التشخيص...">
-            <button id="search-btn" class="btn-action">بحث</button>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <input type="text" id="search-input" placeholder="ابحث باسم المريض أو التشخيص...">
+            <button id="search-btn" style="padding: 10px 20px; cursor: pointer;">بحث</button>
         </div>
         <div id="search-results"></div>
     </section>
 
-    <!-- تبويب الإعدادات والنسخ الاحتياطي -->
+    <!-- تبويب النسخ الاحتياطي -->
     <section id="settings" class="tab-content">
-        <h2>النسخ الاحتياطي للبيانات</h2>
-        <p style="margin: 15px 0; color: var(--secondary-color);">
-            يمكنك تحميل كافة البيانات المسجلة في السحابة مع كافة الملفات والمرفقات المرفوعة في ملف مضغوط بصيغة ZIP بضغطة زر واحدة.
-        </p>
-        <button id="download-backup-btn" class="btn-submit">تنزيل نسخة احتياطية (ZIP)</button>
+        <h2>النسخ الاحتياطي</h2>
+        <p style="margin: 10px 0;">تحميل البيانات والملفات والرفوعات كملف ZIP واحد.</p>
+        <button id="download-backup-btn" class="btn-submit">تنزيل النسخة الاحتياطية (ZIP)</button>
     </section>
 
     <script src="app.js"></script>
