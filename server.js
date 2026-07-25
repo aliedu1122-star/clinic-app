@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@libsql/client');
 const multer = require('multer');
-const path = require('path');
 const helmet = require('helmet');
 const cors = require('cors');
 const cloudinary = require('cloudinary').v2;
@@ -11,7 +10,7 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// إعداد Cloudinary للتخزين الدائم للصور والملفات
+// إعداد Cloudinary للتخزين الدائم للصور والملفات مرفقات المرضى
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -23,7 +22,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// إعداد التخزين السحابي للملفات
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
@@ -37,16 +35,20 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// الاتصال بقاعدة بيانات Turso ومعالجة الرابط الفارغ لتجنب Invalid URL
-const tursoUrl = process.env.TURSO_DATABASE_URL && process.env.TURSO_DATABASE_URL.trim() !== "" 
-    ? process.env.TURSO_DATABASE_URL.trim() 
-    : "libsql://dummy-url.turso.io";
+// ضبط وتجهيز رابط Turso للعمل عبر HTTPS بشكل مباشر ومستقر بدون أخطاء Migration
+let rawUrl = (process.env.TURSO_DATABASE_URL || "").trim().replace(/[\r\n]+/g, "");
+if (rawUrl.startsWith("libsql://")) {
+    rawUrl = rawUrl.replace("libsql://", "https://");
+} else if (rawUrl !== "" && !rawUrl.startsWith("https://")) {
+    rawUrl = "https://" + rawUrl;
+}
 
 const db = createClient({
-    url: tursoUrl,
-    authToken: process.env.TURSO_AUTH_TOKEN || ""
+    url: rawUrl,
+    authToken: (process.env.TURSO_AUTH_TOKEN || "").trim()
 });
 
+// دالة الاتصال والتأكد من وجود الجداول داخل Turso
 async function initDb() {
     try {
         await db.execute(`
@@ -57,6 +59,7 @@ async function initDb() {
                 phone TEXT UNIQUE NOT NULL
             );
         `);
+        
         await db.execute(`
             CREATE TABLE IF NOT EXISTS visits (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,7 +83,7 @@ async function initDb() {
         `);
         console.log("✅ تم الاتصال بقاعدة بيانات Turso وإعداد الجداول بنجاح.");
     } catch (err) {
-        console.error("❌ خطأ في تهيئة قاعدة بيانات Turso:", err);
+        console.error("❌ خطأ الاتصال بقاعدة بيانات Turso:", err.message || err);
     }
 }
 initDb();
@@ -115,7 +118,6 @@ app.post('/api/visit', (req, res, next) => {
         const cleanName = name.trim();
         const parsedAge = age ? parseInt(age) : null;
         
-        // خيارات نوع الزيارة: كشف، استشارة، متابعة، أو تخصيص آخر
         const finalVisitType = (visitType === 'آخر' && customVisitType) ? customVisitType.trim() : (visitType || 'كشف');
         const finalDiagnosis = (diagnosis === 'آخر' && customDiagnosis) ? customDiagnosis.trim() : diagnosis;
 
@@ -232,7 +234,7 @@ app.get('/api/patients', async (req, res) => {
 
         res.json(Object.values(patientsMap));
     } catch (error) {
-        console.error(error);
+        console.error("Fetch Error:", error);
         res.status(500).json({ error: 'خطأ في جلب بيانات المرضى' });
     }
 });
@@ -258,5 +260,5 @@ app.delete('/api/visit/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`✅ سيرفر العيادة المؤمن شغال بنجاح على البورت: ${PORT}`);
+    console.log(`✅ سيرفر العيادة يعمل بنجاح على البورت: ${PORT}`);
 });
