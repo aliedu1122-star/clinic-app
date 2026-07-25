@@ -24,19 +24,18 @@
         .patient-card:hover {
             transform: translateY(-2px);
         }
-        .badge-custom {
-            font-size: 0.85rem;
-            padding: 6px 10px;
-        }
     </style>
 </head>
 <body>
 
     <nav class="navbar navbar-dark bg-primary mb-4 shadow-sm">
-        <div class="container">
+        <div class="container d-flex justify-content-between">
             <span class="navbar-brand mb-0 h1">
                 <i class="fa-solid fa-heart-pulse me-2"></i>نظام إدارة عيادة أمراض القلب
             </span>
+            <a href="/api/export-backup" class="btn btn-light text-primary btn-sm fw-bold">
+                <i class="fa-solid fa-download me-1"></i> تنزيل نسخة احتياطية للكمبيوتر
+            </a>
         </div>
     </nav>
 
@@ -58,7 +57,6 @@
                     </div>
                     <div class="card-body">
                         <form id="visitForm" enctype="multipart/form-data">
-                            <!-- حقول مخفية للتعرف على حالة التعديل -->
                             <input type="hidden" id="visitId" name="visitId" value="">
                             <input type="hidden" id="patientId" name="patientId" value="">
 
@@ -142,30 +140,30 @@
                                 <input type="file" class="form-control" id="medicationImage" name="medicationImage" accept="image/*">
                             </div>
 
-                            <!-- المرفقات الأُخرى -->
-                            <h6 class="text-muted fw-bold border-bottom pb-2 mb-3 mt-2">المرفقات (اختر الفئة)</h6>
+                            <!-- المرفقات -->
+                            <h6 class="text-muted fw-bold border-bottom pb-2 mb-3 mt-2">المرفقات</h6>
 
                             <div class="mb-3">
                                 <label class="form-label"><i class="fa-solid fa-wave-square me-1 text-danger"></i>رسم قلب (ECG)</label>
-                                <input type="file" class="form-control" id="ecgFiles" name="ecgFiles" accept="image/*,.pdf" multiple>
+                                <input type="file" class="form-control" id="ecgFiles" name="ecgFiles" accept="image/*,.pdf">
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label"><i class="fa-solid fa-ultrasound me-1 text-primary"></i>إيكو (Echo)</label>
-                                <input type="file" class="form-control" id="echoFiles" name="echoFiles" accept="image/*,.pdf" multiple>
+                                <input type="file" class="form-control" id="echoFiles" name="echoFiles" accept="image/*,.pdf">
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label"><i class="fa-solid fa-vial me-1 text-warning"></i>تحاليل (Labs)</label>
-                                <input type="file" class="form-control" id="labFiles" name="labFiles" accept="image/*,.pdf" multiple>
+                                <input type="file" class="form-control" id="labFiles" name="labFiles" accept="image/*,.pdf">
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label"><i class="fa-solid fa-box-archive me-1 text-secondary"></i>أخرى (Other)</label>
-                                <input type="file" class="form-control" id="otherFiles" name="otherFiles" accept="image/*,.pdf" multiple>
+                                <input type="file" class="form-control" id="otherFiles" name="otherFiles" accept="image/*,.pdf">
                             </div>
 
-                            <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mt-3">
+                            <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mt-3" id="submitBtn">
                                 <i class="fa-solid fa-floppy-disk me-1"></i>حفظ البيانات
                             </button>
                         </form>
@@ -185,7 +183,7 @@
                 </div>
 
                 <div id="patientsContainer">
-                    <!-- سيتم تحميل كروت المرضى هنا عبر JavaScript -->
+                    <!-- كروت المرضى -->
                 </div>
             </div>
 
