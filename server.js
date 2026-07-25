@@ -10,7 +10,7 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// إعداد Cloudinary للتخزين الدائم للصور والملفات مرفقات المرضى
+// إعداد Cloudinary للملفات
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -35,7 +35,7 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// ضبط وتجهيز رابط Turso للعمل عبر HTTPS بشكل مباشر ومستقر بدون أخطاء Migration
+// معالجة الرابط
 let rawUrl = (process.env.TURSO_DATABASE_URL || "").trim().replace(/[\r\n]+/g, "");
 if (rawUrl.startsWith("libsql://")) {
     rawUrl = rawUrl.replace("libsql://", "https://");
@@ -43,12 +43,14 @@ if (rawUrl.startsWith("libsql://")) {
     rawUrl = "https://" + rawUrl;
 }
 
+// إنشاء العميل مع إيقاف محاولات الـ Migration التي تسبب الخطأ 400
 const db = createClient({
     url: rawUrl,
-    authToken: (process.env.TURSO_AUTH_TOKEN || "").trim()
+    authToken: (process.env.TURSO_AUTH_TOKEN || "").trim(),
+    disableMigrations: true
 });
 
-// دالة الاتصال والتأكد من وجود الجداول داخل Turso
+// تهيئة وقراءة البيانات المباشرة
 async function initDb() {
     try {
         await db.execute(`
@@ -81,7 +83,7 @@ async function initDb() {
                 FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE
             );
         `);
-        console.log("✅ تم الاتصال بقاعدة بيانات Turso وإعداد الجداول بنجاح.");
+        console.log("✅ تم الاتصال بقاعدة بيانات Turso وتجهيز الجداول بنجاح.");
     } catch (err) {
         console.error("❌ خطأ الاتصال بقاعدة بيانات Turso:", err.message || err);
     }
