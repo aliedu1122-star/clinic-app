@@ -29,7 +29,7 @@
     <!-- Main Container -->
     <main class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-        <!-- Form Section (Left / Top on Mobile) -->
+        <!-- Form Section -->
         <section class="lg:col-span-5 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl h-fit">
             <div class="flex justify-between items-center mb-6">
                 <h2 id="formTitle" class="text-lg font-bold text-emerald-400 flex items-center gap-2">
@@ -123,8 +123,7 @@
                 <!-- Attachments Checks & Uploads -->
                 <div class="space-y-3 bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
                     <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">الفحوصات والأشعات</h3>
-                    
-                    <!-- ECG -->
+
                     <div class="flex items-center justify-between">
                         <label class="inline-flex items-center gap-2 text-sm">
                             <input type="checkbox" id="hasEcg" name="hasEcg" value="نعم" onchange="toggleFileInput(this, 'ecgFileDiv')" class="rounded bg-slate-800 border-slate-700 text-emerald-500"> رسم قلب
@@ -134,7 +133,6 @@
                         </div>
                     </div>
 
-                    <!-- Echo Rays -->
                     <div class="flex items-center justify-between">
                         <label class="inline-flex items-center gap-2 text-sm">
                             <input type="checkbox" id="hasRays" name="hasRays" value="نعم" onchange="toggleFileInput(this, 'raysFileDiv')" class="rounded bg-slate-800 border-slate-700 text-emerald-500"> إيكو / أشعة
@@ -144,7 +142,6 @@
                         </div>
                     </div>
 
-                    <!-- Other Rays -->
                     <div class="flex items-center justify-between">
                         <label class="inline-flex items-center gap-2 text-sm">
                             <input type="checkbox" id="hasOtherRays" name="hasOtherRays" value="نعم" onchange="toggleFileInput(this, 'otherRaysFileDiv')" class="rounded bg-slate-800 border-slate-700 text-emerald-500"> أشعات أخرى
@@ -154,7 +151,6 @@
                         </div>
                     </div>
 
-                    <!-- Labs -->
                     <div class="flex items-center justify-between">
                         <label class="inline-flex items-center gap-2 text-sm">
                             <input type="checkbox" id="hasLabs" name="hasLabs" value="نعم" onchange="toggleFileInput(this, 'labsFileDiv')" class="rounded bg-slate-800 border-slate-700 text-emerald-500"> تحاليل
@@ -171,27 +167,23 @@
             </form>
         </section>
 
-        <!-- Patients List Section (Right / Bottom on Mobile) -->
+        <!-- Patients List Section -->
         <section class="lg:col-span-7 space-y-4">
-            <!-- Search Bar -->
             <div class="relative">
                 <i class="fa-solid fa-search absolute right-4 top-3.5 text-slate-400"></i>
                 <input type="text" id="searchInput" oninput="debounceSearch()" placeholder="بحث باسم المريض أو رقم الهاتف..." class="w-full bg-slate-800 border border-slate-700 rounded-xl pr-11 pl-4 py-3 text-white focus:outline-none focus:border-emerald-500 shadow-md">
             </div>
 
-            <!-- Patients Cards Container -->
-            <div id="patientsContainer" class="space-y-4">
-                <!-- Patient cards rendered here dynamically -->
-            </div>
+            <div id="patientsContainer" class="space-y-4"></div>
         </section>
     </main>
 
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-5 left-5 hidden px-6 py-3 rounded-xl shadow-2xl text-white font-semibold z-50 transition-all"></div>
 
-    <!-- Client Script -->
     <script>
-        // XSS Prevention Utility
+        let currentPatientsData = []; // تخزين مؤقت للبيانات لمنع مشاكل الـ HTML Escaping
+
         function escapeHTML(str) {
             if (!str) return '';
             return String(str)
@@ -202,10 +194,8 @@
                 .replace(/'/g, '&#039;');
         }
 
-        // Setup default date to today
         document.getElementById('visitDate').valueAsDate = new Date();
 
-        // UI Handlers
         function toggleCustomType(selectId, divId) {
             const val = document.getElementById(selectId).value;
             const div = document.getElementById(divId);
@@ -242,7 +232,6 @@
             ['ecgFileDiv', 'raysFileDiv', 'otherRaysFileDiv', 'labsFileDiv'].forEach(id => document.getElementById(id).classList.add('hidden'));
         }
 
-        // API Interactions
         async function handleFormSubmit(e) {
             e.preventDefault();
             const submitBtn = document.getElementById('submitBtn');
@@ -282,17 +271,15 @@
             try {
                 const res = await fetch(`/api/patients?q=${encodeURIComponent(query)}`);
                 if (!res.ok) throw new Error();
-                const patients = await res.json();
+                currentPatientsData = await res.json();
 
-                if (patients.length === 0) {
+                if (currentPatientsData.length === 0) {
                     container.innerHTML = `<div class="bg-slate-800 p-8 rounded-2xl text-center text-slate-400">لا يوجد مرضى مسجلين حتى الآن.</div>`;
                     return;
                 }
 
-                // Optimization: Accumulate HTML string to minimize Reflows
                 let htmlBuffer = '';
-
-                patients.forEach(p => {
+                currentPatientsData.forEach(p => {
                     htmlBuffer += `
                         <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 shadow-md">
                             <div class="flex justify-between items-start mb-4">
@@ -308,24 +295,21 @@
                                 </button>
                             </div>
 
-                            <!-- Visits List -->
                             <div class="space-y-3 mt-3">
                                 ${p.visits.map(v => `
                                     <div class="bg-slate-900 p-4 rounded-xl border border-slate-700/60 text-sm">
                                         <div class="flex justify-between items-center text-xs text-slate-400 mb-2">
                                             <span><i class="fa-solid fa-calendar-day text-emerald-400"></i> ${escapeHTML(v.visit_date)} (${escapeHTML(v.visit_type)})</span>
                                             <div class="flex gap-2">
-                                                <button onclick='editVisit(${JSON.stringify(p).replace(/'/g, "&#39;")}, ${JSON.stringify(v).replace(/'/g, "&#39;")})' class="text-emerald-400 hover:underline">تعديل</button>
+                                                <button onclick="triggerEdit(${p.id}, ${v.id})" class="text-emerald-400 hover:underline">تعديل</button>
                                                 <button onclick="deleteVisit(${v.id})" class="text-red-400 hover:underline">حذف</button>
                                             </div>
                                         </div>
                                         ${v.diagnosis ? `<p class="font-semibold text-slate-200 mb-2">التشخيص: <span class="text-emerald-300">${escapeHTML(v.diagnosis)}</span></p>` : ''}
                                         
-                                        <!-- Medication -->
                                         ${v.medication_text ? `<p class="text-xs text-slate-300 bg-slate-800 p-2 rounded mb-2 whitespace-pre-line">${escapeHTML(v.medication_text)}</p>` : ''}
                                         ${v.medication_file ? `<a href="/uploads/${escapeHTML(v.medication_file)}" target="_blank" class="inline-block text-xs text-emerald-400 underline mb-2"><i class="fa-solid fa-file"></i> عرض الروشتة المرفقة</a>` : ''}
 
-                                        <!-- Attachments -->
                                         <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-800 text-xs">
                                             ${v.ecg_file ? `<a href="/uploads/${escapeHTML(v.ecg_file)}" target="_blank" class="bg-slate-800 px-2 py-1 rounded text-slate-300 hover:text-white"><i class="fa-solid fa-heart-pulse text-red-400"></i> رسم قلب</a>` : ''}
                                             ${v.rays_file ? `<a href="/uploads/${escapeHTML(v.rays_file)}" target="_blank" class="bg-slate-800 px-2 py-1 rounded text-slate-300 hover:text-white"><i class="fa-solid fa-x-ray text-blue-400"></i> إيكو/أشعة</a>` : ''}
@@ -345,7 +329,13 @@
             }
         }
 
-        function editVisit(patient, visit) {
+        // دالة التعديل الآمنة باستخدام المعرفات فقط
+        function triggerEdit(patientId, visitId) {
+            const patient = currentPatientsData.find(p => p.id === patientId);
+            if (!patient) return;
+            const visit = patient.visits.find(v => v.id === visitId);
+            if (!visit) return;
+
             document.getElementById('visitId').value = visit.id;
             document.getElementById('patientId').value = patient.id;
             document.getElementById('name').value = patient.name;
@@ -410,7 +400,7 @@
             }
         }
 
-        // Init
+        // Run on start
         loadPatients();
     </script>
 </body>
