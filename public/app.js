@@ -1,23 +1,15 @@
 // المتغيرات العامة
 let currentTab = 'new-booking';
-let currentSearchType = 'phone';
 
 // عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', () => {
-    // إعداد التبديل بين التبويبات
     setupTabs();
-    
-    // إعداد نموذج الحجز الجديد
     setupBookingForm();
-    
-    // إعداد نموذج البحث
     setupSearchForm();
-    
-    // إعداد زر النسخ الاحتياطي
     setupBackupButton();
 });
 
-// 1. التبديل بين الشاشات (التبويبات)
+// 1. التبديل بين الشاشات
 function setupTabs() {
     const navButtons = document.querySelectorAll('.nav-btn');
     const tabContents = document.querySelectorAll('.tab-content');
@@ -59,7 +51,7 @@ function setupBookingForm() {
             const result = await response.json();
 
             if (response.ok) {
-                alert('تم تسجيل الحجز بنجاح!');
+                alert('تم تسجيل البيانات بنجاح!');
                 form.reset();
             } else {
                 alert('حدث خطأ: ' + (result.message || 'فشل حفظ البيانات'));
@@ -69,7 +61,7 @@ function setupBookingForm() {
             alert('تعذر الاتصال بالسيرفر. يرجى المحاولة لاحقاً.');
         } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'حفظ الحجز';
+            submitBtn.textContent = 'حفظ الحجز / البيانات';
         }
     });
 }
@@ -82,14 +74,19 @@ function setupSearchForm() {
 
     if (!searchBtn || !searchInput) return;
 
-    searchBtn.addEventListener('click', async () => {
+    searchBtn.addEventListener('click', performSearch);
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') performSearch();
+    });
+
+    async function performSearch() {
         const query = searchInput.value.trim();
         if (!query) {
             alert('يرجى إدخال كلمة للبحث');
             return;
         }
 
-        searchResults.innerHTML = '<p class="loading">جاري البحث...</p>';
+        searchResults.innerHTML = '<p style="text-align:center; padding: 20px;">جاري البحث...</p>';
 
         try {
             const response = await fetch(`/api/bookings/search?q=${encodeURIComponent(query)}`);
@@ -98,13 +95,13 @@ function setupSearchForm() {
             if (response.ok && data.length > 0) {
                 renderSearchResults(data);
             } else {
-                searchResults.innerHTML = '<p class="no-results">لم يتم العثور على نتائج matching.</p>';
+                searchResults.innerHTML = '<p style="text-align:center; padding: 20px; color: var(--secondary-color);">لم يتم العثور على نتائج متطابقة.</p>';
             }
         } catch (error) {
             console.error('Error fetching search results:', error);
-            searchResults.innerHTML = '<p class="error">حدث خطأ أثناء البحث.</p>';
+            searchResults.innerHTML = '<p style="text-align:center; padding: 20px; color: red;">حدث خطأ أثناء البحث.</p>';
         }
-    });
+    }
 }
 
 // عرض نتائج البحث
@@ -115,8 +112,9 @@ function renderSearchResults(items) {
             <h3>${item.patient_name || 'بدون اسم'}</h3>
             <p><strong>رقم الهاتف:</strong> ${item.phone || '-'}</p>
             <p><strong>الموعد:</strong> ${item.appointment_date || '-'}</p>
+            <p><strong>التشخيص:</strong> ${item.diagnosis || '-'}</p>
             <p><strong>ملاحظات:</strong> ${item.notes || '-'}</p>
-            ${item.attachment_url ? `<a href="${item.attachment_url}" target="_blank" class="file-link">عرض المرفق</a>` : ''}
+            ${item.attachment_url ? `<a href="${item.attachment_url}" target="_blank" class="file-link">📁 عرض / تنزيل المرفق</a>` : ''}
         </div>
     `).join('');
 }
@@ -126,19 +124,15 @@ function setupBackupButton() {
     const backupBtn = document.getElementById('download-backup-btn');
     if (!backupBtn) return;
 
-    backupBtn.addEventListener('click', async () => {
+    backupBtn.addEventListener('click', () => {
         backupBtn.disabled = true;
-        backupBtn.textContent = 'جاري التجهيز...';
+        backupBtn.textContent = 'جاري إعداد ملف الـ ZIP...';
 
-        try {
-            window.location.href = '/api/admin/backup';
-        } catch (error) {
-            alert('فشل تحميل النسخة الاحتياطية.');
-        } finally {
-            setTimeout(() => {
-                backupBtn.disabled = false;
-                backupBtn.textContent = 'تنزيل نسخة احتياطية (ZIP)';
-            }, 3000);
-        }
+        window.location.href = '/api/admin/backup';
+
+        setTimeout(() => {
+            backupBtn.disabled = false;
+            backupBtn.textContent = 'تنزيل نسخة احتياطية (ZIP)';
+        }, 4000);
     });
 }
