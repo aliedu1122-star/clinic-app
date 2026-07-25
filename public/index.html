@@ -3,192 +3,228 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>إدارة عيادة أمراض القلب</title>
-    <!-- Bootstrap 5 RTL -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css">
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <title>نظام إدارة العيادة</title>
     <style>
-        body {
-            background-color: #f8f9fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        :root {
+            --primary-color: #0d6efd;
+            --secondary-color: #6c757d;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #212529;
+            --border-color: #dee2e6;
         }
-        .card {
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        nav {
+            display: flex;
+            gap: 10px;
             margin-bottom: 20px;
         }
-        .patient-card {
-            transition: transform 0.2s;
+
+        .nav-btn {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            transition: all 0.2s;
         }
-        .patient-card:hover {
-            transform: translateY(-2px);
+
+        .nav-btn.active {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .tab-content {
+            display: none;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        input[type="text"],
+        input[type="tel"],
+        input[type="date"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 15px;
+        }
+
+        button.btn-submit,
+        button.btn-action {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            flex: 1;
+        }
+
+        .search-box button {
+            width: auto;
+            padding: 0 25px;
+        }
+
+        .result-card {
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            background-color: #fafafa;
+        }
+
+        .result-card h3 {
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+
+        .result-card p {
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .file-link {
+            display: inline-block;
+            margin-top: 8px;
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .file-link:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
 
-    <nav class="navbar navbar-dark bg-primary mb-4 shadow-sm">
-        <div class="container d-flex justify-content-between">
-            <span class="navbar-brand mb-0 h1">
-                <i class="fa-solid fa-heart-pulse me-2"></i>نظام إدارة عيادة أمراض القلب
-            </span>
-            <a href="/api/export-backup" class="btn btn-light text-primary btn-sm fw-bold">
-                <i class="fa-solid fa-download me-1"></i> تنزيل نسخة احتياطية للكمبيوتر
-            </a>
-        </div>
+    <header>
+        <h1>نظام إدارة العيادة</h1>
+    </header>
+
+    <nav>
+        <button class="nav-btn active" data-tab="new-booking">حجز جديد / حالة</button>
+        <button class="nav-btn" data-tab="search">البحث والجلوس</button>
+        <button class="nav-btn" data-tab="settings">الإعدادات والنسخ الاحتياطي</button>
     </nav>
 
-    <div class="container mb-5">
-        <div class="row">
-            
-            <!-- قسم النموذج (تسجيل / تعديل) -->
-            <div class="col-lg-5">
-                <div class="card border-0">
-                    <div class="card-header bg-white border-0 pt-3 pb-0">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="card-title text-primary fw-bold" id="formTitle">
-                                <i class="fa-solid fa-user-plus me-2"></i>تسجيل زيارة جديدة
-                            </h5>
-                            <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="resetBtn" onclick="resetForm()">
-                                <i class="fa-solid fa-xmark me-1"></i>إلغاء التعديل
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <form id="visitForm" enctype="multipart/form-data">
-                            <input type="hidden" id="visitId" name="visitId" value="">
-                            <input type="hidden" id="patientId" name="patientId" value="">
-
-                            <!-- بيانات المريض -->
-                            <h6 class="text-muted fw-bold border-bottom pb-2 mb-3">بيانات المريض</h6>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">اسم المريض <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="name" name="name" required>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">رقم الهاتف <span class="text-danger">*</span></label>
-                                    <input type="tel" class="form-control" id="phone" name="phone" required>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">السن</label>
-                                    <input type="number" class="form-control" id="age" name="age" min="1" max="120">
-                                </div>
-                            </div>
-
-                            <!-- بيانات الزيارة -->
-                            <h6 class="text-muted fw-bold border-bottom pb-2 mb-3 mt-2">تفاصيل الزيارة</h6>
-
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">تاريخ الزيارة <span class="text-danger">*</span></label>
-                                    <input type="date" class="form-control" id="visitDate" name="visitDate" required>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">نوع الزيارة <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="visitType" name="visitType" onchange="toggleCustomInput('visitType', 'customVisitTypeDiv')" required>
-                                        <option value="كشف">كشف</option>
-                                        <option value="استشارة">استشارة</option>
-                                        <option value="متابعة">متابعة</option>
-                                        <option value="آخر">آخر</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="mb-3 d-none" id="customVisitTypeDiv">
-                                <label class="form-label">حدد نوع الزيارة</label>
-                                <input type="text" class="form-control" id="customVisitType" name="customVisitType">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">التشخيص <span class="text-danger">*</span></label>
-                                <select class="form-select" id="diagnosis" name="diagnosis" onchange="toggleCustomInput('diagnosis', 'customDiagnosisDiv')" required>
-                                    <option value="ارتفاع ضغط الدم">ارتفاع ضغط الدم</option>
-                                    <option value="قصور بالشرايين التاجية">قصور بالشرايين التاجية</option>
-                                    <option value="ضعف بعضلة القلب">ضعف بعضلة القلب</option>
-                                    <option value="آخر">آخر</option>
-                                </select>
-                            </div>
-
-                            <div class="mb-3 d-none" id="customDiagnosisDiv">
-                                <label class="form-label">حدد التشخيص</label>
-                                <input type="text" class="form-control" id="customDiagnosis" name="customDiagnosis">
-                            </div>
-
-                            <!-- الروشتة -->
-                            <h6 class="text-muted fw-bold border-bottom pb-2 mb-3 mt-2">الروشتة / العلاج</h6>
-
-                            <div class="mb-3">
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="medicationType" id="medTextRadio" value="text" checked onclick="toggleMedicationType('text')">
-                                    <label class="form-check-label" for="medTextRadio">روشتة نصية</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="medicationType" id="medImageRadio" value="image" onclick="toggleMedicationType('image')">
-                                    <label class="form-check-label" for="medImageRadio">صورة روشتة</label>
-                                </div>
-                            </div>
-
-                            <div class="mb-3" id="medicationTextDiv">
-                                <textarea class="form-control" id="medicationText" name="medicationText" rows="3" placeholder="اكتب تفاصيل العلاج والجرعات..."></textarea>
-                            </div>
-
-                            <div class="mb-3 d-none" id="medicationImageDiv">
-                                <input type="file" class="form-control" id="medicationImage" name="medicationImage" accept="image/*">
-                            </div>
-
-                            <!-- المرفقات -->
-                            <h6 class="text-muted fw-bold border-bottom pb-2 mb-3 mt-2">المرفقات</h6>
-
-                            <div class="mb-3">
-                                <label class="form-label"><i class="fa-solid fa-wave-square me-1 text-danger"></i>رسم قلب (ECG)</label>
-                                <input type="file" class="form-control" id="ecgFiles" name="ecgFiles" accept="image/*,.pdf">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label"><i class="fa-solid fa-ultrasound me-1 text-primary"></i>إيكو (Echo)</label>
-                                <input type="file" class="form-control" id="echoFiles" name="echoFiles" accept="image/*,.pdf">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label"><i class="fa-solid fa-vial me-1 text-warning"></i>تحاليل (Labs)</label>
-                                <input type="file" class="form-control" id="labFiles" name="labFiles" accept="image/*,.pdf">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label"><i class="fa-solid fa-box-archive me-1 text-secondary"></i>أخرى (Other)</label>
-                                <input type="file" class="form-control" id="otherFiles" name="otherFiles" accept="image/*,.pdf">
-                            </div>
-
-                            <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mt-3" id="submitBtn">
-                                <i class="fa-solid fa-floppy-disk me-1"></i>حفظ البيانات
-                            </button>
-                        </form>
-                    </div>
-                </div>
+    <!-- تبويب حجز جديد -->
+    <section id="new-booking" class="tab-content active">
+        <form id="booking-form">
+            <div class="form-group">
+                <label for="patient_name">اسم المريض:</label>
+                <input type="text" id="patient_name" name="patient_name" required placeholder="أدخل اسم المريض">
             </div>
 
-            <!-- قسم البحث وعرض المرضى -->
-            <div class="col-lg-7">
-                <div class="card border-0 mb-3">
-                    <div class="card-body">
-                        <div class="input-group">
-                            <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                            <input type="text" class="form-control border-start-0" id="searchInput" placeholder="ابحث باسم المريض أو رقم الهاتف..." oninput="loadPatients()">
-                        </div>
-                    </div>
-                </div>
-
-                <div id="patientsContainer">
-                    <!-- كروت المرضى -->
-                </div>
+            <div class="form-group">
+                <label for="phone">رقم الهاتف:</label>
+                <input type="tel" id="phone" name="phone" placeholder="01xxxxxxxx">
             </div>
 
+            <div class="form-group">
+                <label for="appointment_date">تاريخ الموعد:</label>
+                <input type="date" id="appointment_date" name="appointment_date">
+            </div>
+
+            <div class="form-group">
+                <label for="diagnosis">التشخيص (كتابة نصية):</label>
+                <textarea id="diagnosis" name="diagnosis" rows="3" placeholder="اكتب التشخيص التفصيلي هنا..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="notes">ملاحظات إضافية:</label>
+                <textarea id="notes" name="notes" rows="2" placeholder="أي ملاحظات أخرى..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="attachment">ارفاق ملف (صورة / اشعة / مستند):</label>
+                <input type="file" id="attachment" name="attachment">
+            </div>
+
+            <button type="submit" class="btn-submit">حفظ الحجز / البيانات</button>
+        </form>
+    </section>
+
+    <!-- تبويب البحث -->
+    <section id="search" class="tab-content">
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="ابحث باسم المريض، رقم الهاتف، أو التشخيص...">
+            <button id="search-btn" class="btn-action">بحث</button>
         </div>
-    </div>
+        <div id="search-results"></div>
+    </section>
+
+    <!-- تبويب الإعدادات والنسخ الاحتياطي -->
+    <section id="settings" class="tab-content">
+        <h2>النسخ الاحتياطي للبيانات</h2>
+        <p style="margin: 15px 0; color: var(--secondary-color);">
+            يمكنك تحميل كافة البيانات المسجلة في السحابة مع كافة الملفات والمرفقات المرفوعة في ملف مضغوط بصيغة ZIP بضغطة زر واحدة.
+        </p>
+        <button id="download-backup-btn" class="btn-submit">تنزيل نسخة احتياطية (ZIP)</button>
+    </section>
 
     <script src="app.js"></script>
 </body>
