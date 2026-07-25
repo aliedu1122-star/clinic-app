@@ -37,9 +37,13 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// الاتصال بقاعدة بيانات Turso
+// الاتصال بقاعدة بيانات Turso ومعالجة الرابط الفارغ لتجنب Invalid URL
+const tursoUrl = process.env.TURSO_DATABASE_URL && process.env.TURSO_DATABASE_URL.trim() !== "" 
+    ? process.env.TURSO_DATABASE_URL.trim() 
+    : "libsql://dummy-url.turso.io";
+
 const db = createClient({
-    url: process.env.TURSO_DATABASE_URL || "",
+    url: tursoUrl,
     authToken: process.env.TURSO_AUTH_TOKEN || ""
 });
 
@@ -110,7 +114,9 @@ app.post('/api/visit', (req, res, next) => {
         const cleanPhone = phone.trim();
         const cleanName = name.trim();
         const parsedAge = age ? parseInt(age) : null;
-        const finalVisitType = (visitType === 'آخر' && customVisitType) ? customVisitType.trim() : visitType;
+        
+        // خيارات نوع الزيارة: كشف، استشارة، متابعة، أو تخصيص آخر
+        const finalVisitType = (visitType === 'آخر' && customVisitType) ? customVisitType.trim() : (visitType || 'كشف');
         const finalDiagnosis = (diagnosis === 'آخر' && customDiagnosis) ? customDiagnosis.trim() : diagnosis;
 
         let patientId = passedPatientId ? parseInt(passedPatientId) : null;
@@ -164,7 +170,7 @@ app.post('/api/visit', (req, res, next) => {
                         WHERE id = ?
                     `,
                     args: [
-                        visitDate, finalVisitType || 'كشف', finalDiagnosis || '', medicationType || 'text', medicationText || '',
+                        visitDate, finalVisitType, finalDiagnosis || '', medicationType || 'text', medicationText || '',
                         medFile || currentVisit.medication_file, hasEcg || 'لا', ecgFile || currentVisit.ecg_file,
                         hasRays || 'لا', raysFile || currentVisit.rays_file,
                         hasOtherRays || 'لا', otherRaysFile || currentVisit.other_rays_file,
@@ -178,7 +184,7 @@ app.post('/api/visit', (req, res, next) => {
                     INSERT INTO visits (patient_id, visit_date, visit_type, diagnosis, medication_type, medication_text, medication_file, has_ecg, ecg_file, has_rays, rays_file, has_other_rays, other_rays_file, has_labs, labs_file)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `,
-                args: [patientId, visitDate, finalVisitType || 'كشف', finalDiagnosis || '', medicationType || 'text', medicationText || '', medFile, hasEcg || 'لا', ecgFile, hasRays || 'لا', raysFile, hasOtherRays || 'لا', otherRaysFile, hasLabs || 'لا', labsFile]
+                args: [patientId, visitDate, finalVisitType, finalDiagnosis || '', medicationType || 'text', medicationText || '', medFile, hasEcg || 'لا', ecgFile, hasRays || 'لا', raysFile, hasOtherRays || 'لا', otherRaysFile, hasLabs || 'لا', labsFile]
             });
         }
 
