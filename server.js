@@ -25,7 +25,7 @@ const db = createClient({
     authToken: process.env.TURSO_AUTH_TOKEN
 });
 
-// إنشاء الجدول إذا لم يكن موجوداً
+// إنشاء الجدول بالحقول الجديدة
 async function initDb() {
     await db.execute(`
         CREATE TABLE IF NOT EXISTS bookings (
@@ -35,53 +35,71 @@ async function initDb() {
             appointment_date TEXT,
             diagnosis TEXT,
             notes TEXT,
-            attachment_url TEXT,
+            prescription_text TEXT,
+            ecg_url TEXT,
+            xray_url TEXT,
+            prescription_url TEXT,
+            echo_url TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
 }
 initDb().catch(console.error);
 
-// إعدادات الأمن والوسائط
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100
-});
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api/', limiter);
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 1. إضافة حجز جديد
-app.post('/api/bookings', upload.single('attachment'), async (req, res) => {
-    try {
-        const { patient_name, phone, appointment_date, diagnosis, notes } = req.body;
-        let attachment_url = null;
+// إعداد رفع الحقول المتعددة
+const cpUpload = upload.fields([
+    { name: 'ecg_file', maxCount: 1 },
+    { name: 'xray_file', maxCount: 1 },
+    { name: 'prescription_file', maxCount: 1 },
+    { name: 'echo_file', maxCount: 1 }
+]);
 
-        if (req.file) {
-            const b64 = Buffer.from(req.file.buffer).toString("base64");
-            let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
-            const cldRes = await cloudinary.uploader.upload(dataURI, {
-                resource_type: "auto",
-                folder: "clinic_attachments"
-            });
-            attachment_url = cldRes.secure_url;
-        }
+// رفع الملفات لـ Cloudinary
+async function uploadToCloudinary(file, folderName) {
+    if (!file) return null;
+    const b64 = Buffer.from(file.buffer).toString("base64");
+    let dataURI = "data:" + file.mimetype + ";base64," + b64;
+    const cldRes = await cloudinary.uploader.upload(dataURI, {
+        resource_type: "auto",
+        folder: folderName
+    });
+    return cldRes.secure_url;
+}
+
+// 1. تسجيل حالة جديدة
+app.post('/api/bookings', cpUpload, async (req, res) => {
+    try {
+        const { patient_name, phone, appointment_date, diagnosis, notes, prescription_text } = req.body;
+
+        const ecg_url = req.files && req.files['ecg_file'] ? await uploadToCloudinary(req.files['ecg_file'][0], 'clinic_ecg') : null;
+        const xray_url = req.files && req.files['xray_file'] ? await uploadToCloudinary(req.files['xray_file'][0], 'clinic_xray') : null;
+        const prescription_url = req.files && req.files['prescription_file'] ? await uploadToCloudinary(req.files['prescription_file'][0], 'clinic_prescriptions') : null;
+        const echo_url = req.files && req.files['echo_file'] ? await uploadToCloudinary(req.files['echo_file'][0], 'clinic_echo') : null;
 
         await db.execute({
-            sql: `INSERT INTO bookings (patient_name, phone, appointment_date, diagnosis, notes, attachment_url) 
-                  VALUES (?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO bookings (patient_name, phone, appointment_date, diagnosis, notes, prescription_text, ecg_url, xray_url, prescription_url, echo_url) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 patient_name || null,
                 phone || null,
                 appointment_date || null,
                 diagnosis || null,
                 notes || null,
-                attachment_url
+                prescription_text || null,
+                ecg_url,
+                xray_url,
+                prescription_url,
+                echo_url
             ]
         });
 
@@ -98,9 +116,9 @@ app.get('/api/bookings/search', async (req, res) => {
         const query = req.query.q || '';
         const result = await db.execute({
             sql: `SELECT * FROM bookings 
-                  WHERE patient_name LIKE ? OR phone LIKE ? OR diagnosis LIKE ?
+                  WHERE patient_name LIKE ? OR phone LIKE ? OR diagnosis LIKE ? OR prescription_text LIKE ?
                   ORDER BY id DESC LIMIT 50`,
-            args: [`%${query}%`, `%${query}%`, `%${query}%`]
+            args: [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`]
         });
 
         res.json(result.rows);
@@ -110,7 +128,7 @@ app.get('/api/bookings/search', async (req, res) => {
     }
 });
 
-// 3. تنزيل النسخة الاحتياطية (ZIP)
+// 3. تنزيل النسخة الاحتياطية (ZIP) مجمعة
 app.get('/api/admin/backup', async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM bookings");
@@ -120,20 +138,22 @@ app.get('/api/admin/backup', async (req, res) => {
         const archive = archiver('zip', { zlib: { level: 9 } });
         archive.pipe(res);
 
-        // إضافة الملف النصي للبيانات
         archive.append(JSON.stringify(rows, null, 2), { name: 'database_export.json' });
 
-        // إضافة المرفقات
+        const fileTypes = ['ecg_url', 'xray_url', 'prescription_url', 'echo_url'];
+
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
-            if (row.attachment_url) {
-                try {
-                    const response = await axios.get(row.attachment_url, { responseType: 'arraybuffer' });
-                    const urlParts = row.attachment_url.split('/');
-                    const fileName = `attachments/patient_${row.id}_${urlParts[urlParts.length - 1]}`;
-                    archive.append(Buffer.from(response.data), { name: fileName });
-                } catch (err) {
-                    console.error('Error downloading attachment:', row.attachment_url);
+            for (const type of fileTypes) {
+                if (row[type]) {
+                    try {
+                        const response = await axios.get(row[type], { responseType: 'arraybuffer' });
+                        const urlParts = row[type].split('/');
+                        const fileName = `attachments/${type.replace('_url','')}_patient_${row.id}_${urlParts[urlParts.length - 1]}`;
+                        archive.append(Buffer.from(response.data), { name: fileName });
+                    } catch (err) {
+                        console.error('Error downloading attachment:', row[type]);
+                    }
                 }
             }
         }
@@ -145,6 +165,4 @@ app.get('/api/admin/backup', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
