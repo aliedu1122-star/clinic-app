@@ -37,20 +37,16 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// الاتصال بقاعدة بيانات Turso مع تنظيف الرابط من الأخطاء والرموز المخفية
-let rawTursoUrl = (process.env.TURSO_DATABASE_URL || "").trim().replace(/[\r\n]+/g, "");
-if (rawTursoUrl.startsWith("https://")) {
-    rawTursoUrl = rawTursoUrl.replace("https://", "libsql://");
-}
-
-const tursoUrl = rawTursoUrl !== "" ? rawTursoUrl : "libsql://dummy-url.turso.io";
+// الاتصال بقاعدة بيانات Turso ومعالجة الرابط الفارغ لتجنب Invalid URL
+const tursoUrl = process.env.TURSO_DATABASE_URL && process.env.TURSO_DATABASE_URL.trim() !== "" 
+    ? process.env.TURSO_DATABASE_URL.trim() 
+    : "libsql://dummy-url.turso.io";
 
 const db = createClient({
     url: tursoUrl,
-    authToken: (process.env.TURSO_AUTH_TOKEN || "").trim()
+    authToken: process.env.TURSO_AUTH_TOKEN || ""
 });
 
-// تهيئة وإنشاء الجداول تلقائياً
 async function initDb() {
     try {
         await db.execute(`
@@ -61,8 +57,6 @@ async function initDb() {
                 phone TEXT UNIQUE NOT NULL
             );
         `);
-        console.log("✅ تم التأكد من وجود جدول المرضى (patients).");
-
         await db.execute(`
             CREATE TABLE IF NOT EXISTS visits (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,12 +78,11 @@ async function initDb() {
                 FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE
             );
         `);
-        console.log("✅ تم التأكد من وجود جدول الزيارات (visits).");
+        console.log("✅ تم الاتصال بقاعدة بيانات Turso وإعداد الجداول بنجاح.");
     } catch (err) {
-        console.error("❌ خطأ أثناء تهيئة جداول قاعدة البيانات:", err.message);
+        console.error("❌ خطأ في تهيئة قاعدة بيانات Turso:", err);
     }
 }
-
 initDb();
 
 const cpUpload = upload.fields([
@@ -239,7 +232,7 @@ app.get('/api/patients', async (req, res) => {
 
         res.json(Object.values(patientsMap));
     } catch (error) {
-        console.error("Fetch Patients Error:", error);
+        console.error(error);
         res.status(500).json({ error: 'خطأ في جلب بيانات المرضى' });
     }
 });
