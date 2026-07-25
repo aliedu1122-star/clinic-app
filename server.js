@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const { createClient } = require('@libsql/client');
+const { createClient } = require('@libsql/client/http');
 const multer = require('multer');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -10,7 +10,7 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// إعداد Cloudinary للملفات
+// إعداد Cloudinary
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -35,7 +35,7 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// معالجة الرابط
+// معالجة رابط قاعدة البيانات
 let rawUrl = (process.env.TURSO_DATABASE_URL || "").trim().replace(/[\r\n]+/g, "");
 if (rawUrl.startsWith("libsql://")) {
     rawUrl = rawUrl.replace("libsql://", "https://");
@@ -43,14 +43,13 @@ if (rawUrl.startsWith("libsql://")) {
     rawUrl = "https://" + rawUrl;
 }
 
-// إنشاء العميل مع إيقاف محاولات الـ Migration التي تسبب الخطأ 400
+// إنشاء اتصال HTTP مباشر يلغي طلبات Migrations التلقائية
 const db = createClient({
     url: rawUrl,
-    authToken: (process.env.TURSO_AUTH_TOKEN || "").trim(),
-    disableMigrations: true
+    authToken: (process.env.TURSO_AUTH_TOKEN || "").trim()
 });
 
-// تهيئة وقراءة البيانات المباشرة
+// إنشاء الجداول في حالة عدم وجودها
 async function initDb() {
     try {
         await db.execute(`
@@ -61,7 +60,7 @@ async function initDb() {
                 phone TEXT UNIQUE NOT NULL
             );
         `);
-        
+
         await db.execute(`
             CREATE TABLE IF NOT EXISTS visits (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,7 +84,7 @@ async function initDb() {
         `);
         console.log("✅ تم الاتصال بقاعدة بيانات Turso وتجهيز الجداول بنجاح.");
     } catch (err) {
-        console.error("❌ خطأ الاتصال بقاعدة بيانات Turso:", err.message || err);
+        console.error("❌ خطأ قاعدة البيانات:", err.message || err);
     }
 }
 initDb();
