@@ -43,7 +43,7 @@ if (rawUrl.startsWith("libsql://")) {
     rawUrl = "https://" + rawUrl;
 }
 
-// إنشاء اتصال HTTP مباشر يلغي طلبات Migrations التلقائية
+// إنشاء اتصال HTTP مباشر ويلغي طلبات Migrations التلقائية
 const db = createClient({
     url: rawUrl,
     authToken: (process.env.TURSO_AUTH_TOKEN || "").trim()
@@ -52,12 +52,13 @@ const db = createClient({
 // إنشاء الجداول في حالة عدم وجودها
 async function initDb() {
     try {
+        // تم إزالة UNIQUE من phone للسماح بتكرار الرقم لمرضى متكررين بدون اختيار زر التعيين الصريح
         await db.execute(`
             CREATE TABLE IF NOT EXISTS patients (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 age INTEGER,
-                phone TEXT UNIQUE NOT NULL
+                phone TEXT NOT NULL
             );
         `);
 
@@ -125,29 +126,18 @@ app.post('/api/visit', (req, res, next) => {
         let patientId = passedPatientId ? parseInt(passedPatientId) : null;
 
         if (patientId) {
+            // يتم التحديث فقط إذا قام الطبيب بالنقر صراحة على إضافة زيارة لمريض محدد
             await db.execute({
                 sql: 'UPDATE patients SET name = ?, age = ?, phone = ? WHERE id = ?',
                 args: [cleanName, parsedAge, cleanPhone, patientId]
             });
         } else {
-            let existingPatientRes = await db.execute({
-                sql: 'SELECT id FROM patients WHERE phone = ?',
-                args: [cleanPhone]
+            // في حالة عدم إرسال patientId ينشئ سجلاً جديداً دائماً حتى مع تشابه الاسم أو الهاتف
+            let insertRes = await db.execute({
+                sql: 'INSERT INTO patients (name, age, phone) VALUES (?, ?, ?)',
+                args: [cleanName, parsedAge, cleanPhone]
             });
-
-            if (existingPatientRes.rows.length > 0) {
-                patientId = existingPatientRes.rows[0].id;
-                await db.execute({
-                    sql: 'UPDATE patients SET name = ?, age = ? WHERE id = ?',
-                    args: [cleanName, parsedAge, patientId]
-                });
-            } else {
-                let insertRes = await db.execute({
-                    sql: 'INSERT INTO patients (name, age, phone) VALUES (?, ?, ?)',
-                    args: [cleanName, parsedAge, cleanPhone]
-                });
-                patientId = Number(insertRes.lastInsertRowid);
-            }
+            patientId = Number(insertRes.lastInsertRowid);
         }
 
         const medFile = req.files?.['medicationFile']?.[0]?.path || null;
