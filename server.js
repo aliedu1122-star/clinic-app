@@ -6,9 +6,13 @@ const helmet = require('helmet');
 const cors = require('cors');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// مفتاح تشفير التوكن (يمكنك تغييره أو وضعه في ملف .env)
+const JWT_SECRET = process.env.JWT_SECRET || 'clinic_secret_key_heart_1471155';
 
 // إعداد Cloudinary
 cloudinary.config({
@@ -22,6 +26,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// إعداد التخزين المباشر لـ Cloudinary
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
@@ -35,7 +40,7 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// معالجة رابط قاعدة البيانات
+// معالجة رابط قاعدة البيانات Turso
 let rawUrl = (process.env.TURSO_DATABASE_URL || "").trim().replace(/[\r\n]+/g, "");
 if (rawUrl.startsWith("libsql://")) {
     rawUrl = rawUrl.replace("libsql://", "https://");
@@ -43,16 +48,14 @@ if (rawUrl.startsWith("libsql://")) {
     rawUrl = "https://" + rawUrl;
 }
 
-// إنشاء اتصال HTTP مباشر ويلغي طلبات Migrations التلقائية
 const db = createClient({
     url: rawUrl,
     authToken: (process.env.TURSO_AUTH_TOKEN || "").trim()
 });
 
-// إنشاء الجداول في حالة عدم وجودها
+// تهيئة قاعدة البيانات
 async function initDb() {
     try {
-        // تم إزالة UNIQUE من phone للسماح بتكرار الرقم لمرضى متكررين بدون اختيار زر التعيين الصريح
         await db.execute(`
             CREATE TABLE IF NOT EXISTS patients (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,6 +93,46 @@ async function initDb() {
 }
 initDb();
 
+// -------------------------------------------------------------
+// 🔒 نظام تسجيل الدخول والحماية (Authentication)
+// -------------------------------------------------------------
+
+// مسار تسجيل الدخول
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+
+    // التحقق من بيانات الدخول
+    if (username === 'moclinc147' && password === 'Drheart1155##') {
+        // إنشاء التوكن وصلاحيته سنتين لراحة الطبيب
+        const token = jwt.sign({ user: username }, JWT_SECRET, { expiresIn: '730d' });
+        return res.json({ success: true, token });
+    }
+
+    return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+});
+
+// Middlware لحماية الـ APIs ومنع أي وصول غير مصرح
+const requireAuth = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'غير مصرح لك بالوصول. يرجى تسجيل الدخول أولاً' });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ error: 'جلسة الدخول انتهت أو التوكن غير صالح' });
+        }
+        req.user = user;
+        next();
+    });
+};
+
+// -------------------------------------------------------------
+// 🛠️ باقي الـ Endpoints المحمية بـ requireAuth
+// -------------------------------------------------------------
+
 const cpUpload = upload.fields([
     { name: 'medicationFile', maxCount: 1 },
     { name: 'ecgFile', maxCount: 1 },
@@ -98,8 +141,8 @@ const cpUpload = upload.fields([
     { name: 'labsFile', maxCount: 1 }
 ]);
 
-// حفظ / تعديل زيارة ومريض
-app.post('/api/visit', (req, res, next) => {
+// حفظ / تعديل زيارة ومريض (محمي)
+app.post('/api/visit', requireAuth, (req, res, next) => {
     cpUpload(req, res, (err) => {
         if (err) return res.status(400).json({ error: err.message });
         next();
@@ -126,13 +169,11 @@ app.post('/api/visit', (req, res, next) => {
         let patientId = passedPatientId ? parseInt(passedPatientId) : null;
 
         if (patientId) {
-            // يتم التحديث فقط إذا قام الطبيب بالنقر صراحة على إضافة زيارة لمريض محدد
             await db.execute({
                 sql: 'UPDATE patients SET name = ?, age = ?, phone = ? WHERE id = ?',
                 args: [cleanName, parsedAge, cleanPhone, patientId]
             });
         } else {
-            // في حالة عدم إرسال patientId ينشئ سجلاً جديداً دائماً حتى مع تشابه الاسم أو الهاتف
             let insertRes = await db.execute({
                 sql: 'INSERT INTO patients (name, age, phone) VALUES (?, ?, ?)',
                 args: [cleanName, parsedAge, cleanPhone]
@@ -188,8 +229,8 @@ app.post('/api/visit', (req, res, next) => {
     }
 });
 
-// جلب قائمة المرضى وزياراتهم
-app.get('/api/patients', async (req, res) => {
+// جلب قائمة المرضى (محمي)
+app.get('/api/patients', requireAuth, async (req, res) => {
     try {
         const query = req.query.q ? `%${req.query.q.trim()}%` : '%';
         const result = await db.execute({
@@ -230,8 +271,8 @@ app.get('/api/patients', async (req, res) => {
     }
 });
 
-// حذف مريض
-app.delete('/api/patient/:id', async (req, res) => {
+// حذف مريض (محمي)
+app.delete('/api/patient/:id', requireAuth, async (req, res) => {
     try {
         await db.execute({ sql: 'DELETE FROM patients WHERE id = ?', args: [req.params.id] });
         res.json({ success: true, message: 'تم حذف سجل المريض بنجاح' });
@@ -240,8 +281,8 @@ app.delete('/api/patient/:id', async (req, res) => {
     }
 });
 
-// حذف زيارة
-app.delete('/api/visit/:id', async (req, res) => {
+// حذف زيارة (محمي)
+app.delete('/api/visit/:id', requireAuth, async (req, res) => {
     try {
         await db.execute({ sql: 'DELETE FROM visits WHERE id = ?', args: [req.params.id] });
         res.json({ success: true, message: 'تم حذف الزيارة بنجاح' });
@@ -251,5 +292,5 @@ app.delete('/api/visit/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`✅ سيرفر العيادة يعمل بنجاح على البورت: ${PORT}`);
+    console.log(`✅ سيرفر العيادة يعمل بنجاح ومؤمن على البورت: ${PORT}`);
 });
