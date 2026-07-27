@@ -1,441 +1,555 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سجل المرضى</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary-color: #2563eb;
-            --primary-dark: #1d4ed8;
-            --bg-body: #f8fafc;
-            --card-bg: #ffffff;
-            --border-color: #e2e8f0;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-        }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سجل المرضى </title>
+    <!-- Bootstrap RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts (Cairo) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --primary-soft: #eff6ff;
+            --bg-main: #f1f5f9;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --text-title: #0f172a;
+            --text-body: #334155;
+            --text-muted: #64748b;
+            --radius-lg: 16px;
+            --radius-md: 10px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 20px -2px rgba(0,0,0,0.05);
+        }
 
-        body {
-            background-color: var(--bg-body);
-            color: var(--text-main);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-body);
+            font-family: 'Cairo', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
 
-        .main-header {
-            background: linear-gradient(135deg, #1e293b, #0f172a);
-            color: white;
-            padding: 24px 0;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 20px -5px rgba(15, 23, 42, 0.15);
-        }
+        /* Top Bar */
+        .app-bar {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 0;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .app-brand {
+            font-weight: 800;
+            font-size: 1.35rem;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
-        .card {
-            border: 1px solid var(--border-color);
-            border-radius: 14px;
-            background-color: var(--card-bg);
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-            margin-bottom: 25px;
-            transition: box-shadow 0.2s ease;
-        }
+        /* Cards Layout */
+        .main-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
 
-        .card-header {
-            background-color: var(--card-bg);
-            border-bottom: 1px solid var(--border-color);
-            font-weight: 700;
-            font-size: 1.1rem;
-            border-radius: 14px 14px 0 0 !important;
-            padding: 16px 20px;
-        }
+        .main-card-header {
+            background: #fafafa;
+            border-bottom: 1px solid var(--border);
+            padding: 18px 24px;
+            font-weight: 700;
+            color: var(--text-title);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-        .btn-primary {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
-        }
+        /* Section Separator inside Form */
+        .section-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--primary);
+            letter-spacing: 0.5px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
 
-        .btn-primary:hover {
-            background-color: var(--primary-dark);
-            border-color: var(--primary-dark);
-        }
+        .section-label::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
 
-        .btn-custom {
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-weight: 600;
-        }
+        /* Form Inputs Modernization */
+        .form-label {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-title);
+            margin-bottom: 6px;
+        }
 
-        .visit-card {
-            border: 1px solid #e2e8f0;
-            border-right: 4px solid var(--primary-color) !important;
-            background-color: #ffffff;
-            border-radius: 10px;
-        }
+        .form-control, .form-select {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            font-size: 0.95rem;
+            background-color: #f8fafc;
+            transition: all 0.2s ease;
+        }
 
-        .form-control, .form-select {
-            border-color: var(--border-color);
-            border-radius: 8px;
-            padding: 9px 12px;
-        }
+        .form-control:focus, .form-select:focus {
+            background-color: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
 
-        .form-control:focus, .form-select:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-        }
-    </style>
+        /* Radio Toggle Switch Styling */
+        .segmented-control {
+            display: flex;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: var(--radius-md);
+            gap: 4px;
+        }
+
+        .segmented-control .btn-check + .btn {
+            flex: 1;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding: 8px;
+        }
+
+        .segmented-control .btn-check:checked + .btn {
+            background: #fff;
+            color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Patient Accordion Modernization */
+        .accordion-item {
+            border: 1px solid var(--border) !important;
+            border-radius: var(--radius-md) !important;
+            margin-bottom: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .accordion-button {
+            padding: 16px 20px;
+            font-weight: 600;
+            background: #ffffff;
+        }
+
+        .accordion-button:not(.collapsed) {
+            background: var(--primary-soft);
+            color: var(--primary);
+            box-shadow: none;
+        }
+
+        .visit-card {
+            border: 1px solid var(--border);
+            border-right: 4px solid var(--primary) !important;
+            background: #ffffff;
+            border-radius: var(--radius-md);
+            padding: 14px;
+            margin-top: 10px;
+        }
+
+        .file-badge {
+            font-size: 0.78rem;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .btn-custom {
+            border-radius: var(--radius-md);
+            padding: 10px 18px;
+            font-weight: 700;
+        }
+    </style>
 </head>
 <body>
 
-    <header class="main-header text-center">
-        <div class="container">
-            <h2><i class="fa-solid fa-user-doctor me-2"></i>سجل المرضى</h2>
-            <p class="mb-0 text-white-50">إدارة سجلات المرضى والزيارات الطبية</p>
-        </div>
-    </header>
+    <!-- Header / Navbar -->
+    <nav class="app-bar">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div class="app-brand">
+                <i class="fa-solid fa-heart-pulse text-primary fs-3"></i>
+                <span> عيادة </span>
+            </div>
+            <a href="/api/backup" class="btn btn-sm btn-outline-primary fw-bold rounded-pill px-3">
+                <i class="fa-solid fa-cloud-arrow-down me-1"></i> نسخة احتياطية
+            </a>
+        </div>
+    </nav>
 
-    <div class="container mb-5">
-        <div class="row">
-            <!-- نموذج إدخال وتعديل البيانات -->
-            <div class="col-lg-5">
-                <div class="card">
-                    <div class="card-header text-primary d-flex justify-content-between align-items-center">
-                        <span id="formTitle"><i class="fa-solid fa-pen-to-square me-2"></i>تسجيل زيارة جديدة</span>
-                        <button class="btn btn-sm btn-outline-secondary d-none" id="resetBtn" onclick="resetForm()">إلغاء التعديل</button>
-                    </div>
-                    <div class="card-body p-4">
-                        <form id="visitForm" enctype="multipart/form-data">
-                            <input type="hidden" id="visitId" name="visitId">
-                            <input type="hidden" id="patientId" name="patientId">
+    <div class="container mb-5">
+        <div class="row g-4">
+            
+            <!-- العمود الأيمن: نموذج الإدخال والتعديل -->
+            <div class="col-lg-5">
+                <div class="main-card">
+                    <div class="main-card-header">
+                        <span id="formTitle"><i class="fa-solid fa-user-plus me-2 text-primary"></i>تسجيل زيارة جديدة</span>
+                        <button class="btn btn-sm btn-light border text-danger d-none fw-semibold" id="resetBtn" onclick="resetForm()">إلغاء التعديل</button>
+                    </div>
+                    
+                    <div class="card-body p-4">
+                        <form id="visitForm" enctype="multipart/form-data">
+                            <input type="hidden" id="visitId" name="visitId">
+                            <input type="hidden" id="patientId" name="patientId">
 
-                            <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-user me-1"></i> بيانات المريض</h6>
-                            <div class="mb-3">
-                                <label class="form-label">اسم المريض *</label>
-                                <input type="text" class="form-control" id="name" name="name" required placeholder="أدخل اسم المريض الرباعي">
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">السن</label>
-                                    <input type="number" class="form-control" id="age" name="age" placeholder="مثال: 35">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">رقم الهاتف *</label>
-                                    <input type="text" class="form-control" id="phone" name="phone" required placeholder="01xxxxxxxxx">
-                                </div>
-                            </div>
+                            <!-- بيانات المريض الأساسية -->
+                            <div class="section-label">
+                                <i class="fa-solid fa-id-card"></i> بيانات المريض
+                            </div>
 
-                            <hr class="my-4" style="border-color: var(--border-color);">
-                            <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-stethoscope me-1"></i> تفاصيل الزيارة</h6>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">تاريخ الزيارة</label>
-                                    <input type="date" class="form-control" id="visitDate" name="visitDate">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">نوع الزيارة</label>
-                                    <select class="form-select" id="visitType" name="visitTypeSelect" onchange="toggleCustomInput('visitType', 'customVisitTypeDiv')">
-                                        <option value="كشف">كشف</option>
-                                        <option value="متابعه">متابعة</option>
-                                        <option value="استشارة">استشارة</option>
-                                        <option value="آخر">آخر</option>
-                                    </select>
-                                </div>
-                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">اسم المريض الرباعي <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" required placeholder="أدخل اسم المريض">
+                            </div>
 
-                            <div class="mb-3 d-none" id="customVisitTypeDiv">
-                                <label class="form-label">حدد نوع الزيارة الآخر</label>
-                                <input type="text" class="form-control" id="customVisitType" placeholder="نوع الزيارة المخصص">
-                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label">السن</label>
+                                    <input type="number" class="form-control" id="age" name="age" placeholder="مثال: 35">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">رقم الهاتف <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="phone" name="phone" required placeholder="01xxxxxxxxx">
+                                </div>
+                            </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">التشخيص</label>
-                                <select class="form-select mb-2" id="diagnosis" name="diagnosisSelect" onchange="toggleCustomInput('diagnosis', 'customDiagnosisDiv')">
-                                    <option value="">اختر التشخيص...</option>
-                                    <option value="ارتفاع ضغط الدم">ارتفاع ضغط الدم</option>
-                                    <option value="قصور بالشرايين التاجية">قصور بالشرايين التاجية</option>
-                                    <option value="ضعف بعضلة القلب">ضعف بعضلة القلب</option>
-                                    <option value="آخر">آخر</option>
-                                </select>
-                            </div>
+                            <!-- تفاصيل الزيارة -->
+                            <div class="section-label mt-4">
+                                <i class="fa-solid fa-stethoscope"></i> تفاصيل الزيارة
+                            </div>
 
-                            <div class="mb-3 d-none" id="customDiagnosisDiv">
-                                <input type="text" class="form-control" id="customDiagnosis" placeholder="أدخل التشخيص المخصص">
-                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label">تاريخ الزيارة</label>
+                                    <input type="date" class="form-control" id="visitDate" name="visitDate">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">نوع الزيارة</label>
+                                    <select class="form-select" id="visitType" name="visitTypeSelect" onchange="toggleCustomInput('visitType', 'customVisitTypeDiv')">
+                                        <option value="كشف">كشف</option>
+                                        <option value="متابعه">متابعة</option>
+                                        <option value="استشارة">استشارة</option>
+                                        <option value="آخر">آخر</option>
+                                    </select>
+                                </div>
+                            </div>
 
-                            <div class="mb-3">
-                                <label class="form-label d-block">الروشتة العلاجية</label>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="medicationType" id="medTextRadio" value="text" checked onclick="toggleMedicationType('text')">
-                                    <label class="form-check-label" for="medTextRadio">كتابة نصية</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="medicationType" id="medFileRadio" value="file" onclick="toggleMedicationType('file')">
-                                    <label class="form-check-label" for="medFileRadio">رفع ملف / صورة</label>
-                                </div>
-                            </div>
+                            <div class="mb-3 d-none" id="customVisitTypeDiv">
+                                <input type="text" class="form-control" id="customVisitType" placeholder="حدد نوع الزيارة الآخر...">
+                            </div>
 
-                            <div class="mb-3" id="medTextInput">
-                                <textarea class="form-control" id="medicationText" name="medicationText" rows="3" placeholder="أكتب العلاج والجرعات هنا..."></textarea>
-                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">التشخيص الطبي</label>
+                                <select class="form-select" id="diagnosis" name="diagnosisSelect" onchange="toggleCustomInput('diagnosis', 'customDiagnosisDiv')">
+                                    <option value="">اختر التشخيص...</option>
+                                    <option value="ارتفاع ضغط الدم">ارتفاع ضغط الدم</option>
+                                    <option value="قصور بالشرايين التاجية">قصور بالشرايين التاجية</option>
+                                    <option value="ضعف بعضلة القلب">ضعف بعضلة القلب</option>
+                                    <option value="آخر">آخر</option>
+                                </select>
+                            </div>
 
-                            <div class="mb-3 d-none" id="medFileInput">
-                                <input type="file" class="form-control" id="medicationFile" name="medicationFile">
-                            </div>
+                            <div class="mb-3 d-none" id="customDiagnosisDiv">
+                                <input type="text" class="form-control" id="customDiagnosis" placeholder="أدخل التشخيص المخصص...">
+                            </div>
 
-                            <hr class="my-4" style="border-color: var(--border-color);">
-                            <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-paperclip me-1"></i> الفحوصات والملفات المرفقة</h6>
+                            <!-- العلاج والروشتة -->
+                            <div class="mb-3">
+                                <label class="form-label d-block">طريقة تقديم الروشتة</label>
+                                <div class="segmented-control">
+                                    <input type="radio" class="btn-check" name="medicationType" id="medTextRadio" value="text" checked onclick="toggleMedicationType('text')">
+                                    <label class="btn" for="medTextRadio"><i class="fa-solid fa-pen-nib me-1"></i> نصية</label>
 
-                            <div class="mb-3">
-                                <label class="form-label">رسم قلب (ECG)</label>
-                                <input type="file" class="form-control" id="ecgFile" name="ecgFile">
-                            </div>
+                                    <input type="radio" class="btn-check" name="medicationType" id="medFileRadio" value="file" onclick="toggleMedicationType('file')">
+                                    <label class="btn" for="medFileRadio"><i class="fa-solid fa-file-arrow-up me-1"></i> رفع ملف/صورة</label>
+                                </div>
+                            </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">أشعة إيكو / أشعة سينية</label>
-                                <input type="file" class="form-control" id="raysFile" name="raysFile">
-                            </div>
+                            <div class="mb-3" id="medTextInput">
+                                <textarea class="form-control" id="medicationText" name="medicationText" rows="3" placeholder="أكتب الأدوية والجرعات بالتفصيل..."></textarea>
+                            </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">أشعات أخرى</label>
-                                <input type="file" class="form-control" id="otherRaysFile" name="otherRaysFile">
-                            </div>
+                            <div class="mb-3 d-none" id="medFileInput">
+                                <input type="file" class="form-control" id="medicationFile" name="medicationFile">
+                            </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">تحاليل طبية</label>
-                                <input type="file" class="form-control" id="labsFile" name="labsFile">
-                            </div>
+                            <!-- المرفقات والفحوصات -->
+                            <div class="section-label mt-4">
+                                <i class="fa-solid fa-folder-open"></i> الفحوصات والتحاليل
+                            </div>
 
-                            <button type="submit" class="btn btn-primary w-100 btn-custom mt-3">
-                                <i class="fa-solid fa-floppy-disk me-1"></i> حفظ البيانات
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small">رسم قلب (ECG)</label>
+                                    <input type="file" class="form-control form-control-sm" id="ecgFile" name="ecgFile">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small">أشعة إيكو / سينية</label>
+                                    <input type="file" class="form-control form-control-sm" id="raysFile" name="raysFile">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small">أشعات أخرى</label>
+                                    <input type="file" class="form-control form-control-sm" id="otherRaysFile" name="otherRaysFile">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small">تحاليل طبية</label>
+                                    <input type="file" class="form-control form-control-sm" id="labsFile" name="labsFile">
+                                </div>
+                            </div>
 
-            <!-- عرض قائمة المرضى -->
-            <div class="col-lg-7">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="fa-solid fa-users me-2"></i>قائمة المرضى والسجلات</span>
-                        <a href="/api/backup" class="btn btn-sm btn-outline-success">
-                            <i class="fa-solid fa-file-zipper me-1"></i> تحميل نسخة احتياطية
-                        </a>
-                    </div>
-                    <div class="card-body p-4">
-                        <div class="input-group mb-4">
-                            <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                            <input type="text" class="form-control border-start-0" id="searchInput" placeholder="بحث باسم المريض أو رقم الهاتف..." onkeyup="searchPatients()">
-                        </div>
+                            <button type="submit" class="btn btn-primary w-100 btn-custom mt-3">
+                                <i class="fa-solid fa-floppy-disk me-1"></i> حفظ البيانات بالكامل
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
 
-                        <div id="patientsAccordion" class="accordion"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+            <!-- العمود الأيسر: عرض السجلات والبحث -->
+            <div class="col-lg-7">
+                <div class="main-card">
+                    <div class="main-card-header">
+                        <span><i class="fa-solid fa-users me-2 text-primary"></i>قائمة المرضى المسجلين</span>
+                    </div>
+                    <div class="card-body p-4">
+                        
+                        <!-- شريط البحث -->
+                        <div class="input-group mb-4">
+                            <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0" id="searchInput" placeholder="ابحث باسم المريض أو رقم الهاتف..." onkeyup="searchPatients()">
+                        </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            loadPatients();
-            document.getElementById('visitDate').valueAsDate = new Date();
-        });
+                        <!-- قائمة المرضى -->
+                        <div id="patientsAccordion" class="accordion"></div>
+                    </div>
+                </div>
+            </div>
 
-        function escapeHTML(str) {
-            if (!str) return '';
-            return String(str).replace(/[&<>"']/g, match => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-            }[match]));
-        }
+        </div>
+    </div>
 
-        function toggleCustomInput(selectId, targetDivId) {
-            const select = document.getElementById(selectId);
-            const targetDiv = document.getElementById(targetDivId);
-            if (select.value === 'آخر') {
-                targetDiv.classList.remove('d-none');
-            } else {
-                targetDiv.classList.add('d-none');
-            }
-        }
+    <!-- Script Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPatients();
+            document.getElementById('visitDate').valueAsDate = new Date();
+        });
 
-        function toggleMedicationType(type) {
-            if (type === 'text') {
-                document.getElementById('medTextInput').classList.remove('d-none');
-                document.getElementById('medFileInput').classList.add('d-none');
-                document.getElementById('medicationFile').value = ''; 
-            } else {
-                document.getElementById('medTextInput').classList.add('d-none');
-                document.getElementById('medFileInput').classList.remove('d-none');
-                document.getElementById('medicationText').value = ''; 
-            }
-        }
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, match => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[match]));
+        }
 
-        async function loadPatients(query = '') {
-            try {
-                const res = await fetch(`/api/patients?q=${encodeURIComponent(query)}`);
-                const patients = await res.json();
-                const accordion = document.getElementById('patientsAccordion');
-                accordion.innerHTML = '';
+        function toggleCustomInput(selectId, targetDivId) {
+            const select = document.getElementById(selectId);
+            const targetDiv = document.getElementById(targetDivId);
+            if (select.value === 'آخر') {
+                targetDiv.classList.remove('d-none');
+            } else {
+                targetDiv.classList.add('d-none');
+            }
+        }
 
-                if (!patients || patients.length === 0) {
-                    accordion.innerHTML = '<div class="text-center text-muted p-4">لا توجد سجلات مطابقة.</div>';
-                    return;
-                }
+        function toggleMedicationType(type) {
+            if (type === 'text') {
+                document.getElementById('medTextInput').classList.remove('d-none');
+                document.getElementById('medFileInput').classList.add('d-none');
+                document.getElementById('medicationFile').value = ''; 
+            } else {
+                document.getElementById('medTextInput').classList.add('d-none');
+                document.getElementById('medFileInput').classList.remove('d-none');
+                document.getElementById('medicationText').value = ''; 
+            }
+        }
 
-                patients.forEach((patient) => {
-                    let visitsHTML = '';
-                    if (patient.visits && patient.visits.length > 0) {
-                        patient.visits.forEach(v => {
-                            let filesBadges = '';
-                            
-                            if (v.medication_file) filesBadges += `<a href="${escapeHTML(v.medication_file)}" target="_blank" class="badge bg-primary text-decoration-none me-1 mb-1"><i class="fa-solid fa-file-prescription"></i> الروشتة</a> `;
-                            if (v.ecg_file) filesBadges += `<a href="${escapeHTML(v.ecg_file)}" target="_blank" class="badge bg-danger text-decoration-none me-1 mb-1"><i class="fa-solid fa-heart-pulse"></i> رسم القلب</a> `;
-                            if (v.rays_file) filesBadges += `<a href="${escapeHTML(v.rays_file)}" target="_blank" class="badge bg-info text-dark text-decoration-none me-1 mb-1"><i class="fa-solid fa-x-ray"></i> أشعة/إيكو</a> `;
-                            if (v.other_rays_file) filesBadges += `<a href="${escapeHTML(v.other_rays_file)}" target="_blank" class="badge bg-secondary text-decoration-none me-1 mb-1"><i class="fa-solid fa-images"></i> أشعات أخرى</a> `;
-                            if (v.labs_file) filesBadges += `<a href="${escapeHTML(v.labs_file)}" target="_blank" class="badge bg-warning text-dark text-decoration-none me-1 mb-1"><i class="fa-solid fa-vial"></i> التحاليل</a> `;
+        async function loadPatients(query = '') {
+            try {
+                const res = await fetch(`/api/patients?q=${encodeURIComponent(query)}`);
+                const patients = await res.json();
+                const accordion = document.getElementById('patientsAccordion');
+                accordion.innerHTML = '';
 
-                            visitsHTML += `
-                                <div class="card visit-card mb-2 p-3">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div>
-                                            <span class="badge bg-secondary mb-1">${escapeHTML(v.visit_type || 'كشف')}</span>
-                                            <small class="text-muted ms-2">${escapeHTML(v.visit_date || '')}</small>
-                                            <h6 class="fw-bold mt-1 text-dark">التشخيص: ${escapeHTML(v.diagnosis || 'غير محدد')}</h6>
-                                        </div>
-                                        <div>
-                                            <button class="btn btn-sm btn-outline-danger ms-1" onclick="deleteVisit(${v.id})" title="حذف الزيارة"><i class="fa-solid fa-trash"></i></button>
-                                        </div>
-                                    </div>
-                                    ${v.medication_text ? `<div class="p-2 bg-light rounded mt-2"><small class="fw-bold d-block">العلاج:</small><pre class="mb-0 text-wrap" style="font-family: inherit;">${escapeHTML(v.medication_text)}</pre></div>` : ''}
-                                    <div class="mt-2">${filesBadges}</div>
-                                </div>
-                            `;
-                        });
-                    } else {
-                        visitsHTML = '<p class="text-muted small">لا توجد زيارات مسجلة لهذا المريض.</p>';
-                    }
+                if (!patients || patients.length === 0) {
+                    accordion.innerHTML = '<div class="text-center text-muted p-5 bg-light rounded"><i class="fa-regular fa-folder-open fs-1 mb-2 d-block"></i>لا توجد سجلات مطابقة.</div>';
+                    return;
+                }
 
-                    accordion.innerHTML += `
-                        <div class="accordion-item mb-2 border rounded" style="border-color: var(--border-color) !important;">
-                            <h2 class="accordion-header" id="heading${patient.id}">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${patient.id}">
-                                    <div class="d-flex justify-content-between align-items-center w-100 me-3">
-                                        <span class="fw-bold text-primary">${escapeHTML(patient.name)}</span>
-                                        <span class="badge bg-light text-dark border me-3">${escapeHTML(patient.phone)}</span>
-                                    </div>
-                                </button>
-                            </h2>
-                            <div id="collapse${patient.id}" class="accordion-collapse collapse" data-bs-parent="#patientsAccordion">
-                                <div class="accordion-body bg-light">
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <div>
-                                            <span><strong>السن:</strong> ${patient.age || 'غير محدد'} سنة</span>
-                                        </div>
-                                        <div>
-                                            <button class="btn btn-sm btn-outline-primary me-1" onclick="addNewVisitForPatient(${patient.id}, '${escapeHTML(patient.name)}', '${escapeHTML(patient.phone)}', ${patient.age})"><i class="fa-solid fa-plus"></i> إضافة زيارة جديدة</button>
-                                            <button class="btn btn-sm btn-outline-danger" onclick="deletePatient(${patient.id})"><i class="fa-solid fa-user-xmark"></i> حذف المريض</button>
-                                        </div>
-                                    </div>
-                                    <hr style="border-color: var(--border-color);">
-                                    <h6 class="fw-bold mb-3"><i class="fa-solid fa-clock-rotate-left me-1"></i> سجل الزيارات:</h6>
-                                    ${visitsHTML}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-            } catch (err) {
-                console.error("خطأ في جلب البيانات:", err);
-            }
-        }
+                patients.forEach((patient) => {
+                    let visitsHTML = '';
+                    if (patient.visits && patient.visits.length > 0) {
+                        patient.visits.forEach(v => {
+                            let filesBadges = '';
+                            
+                            if (v.medication_file) filesBadges += `<a href="${escapeHTML(v.medication_file)}" target="_blank" class="badge bg-primary-subtle text-primary border border-primary-subtle file-badge text-decoration-none me-1 mb-1"><i class="fa-solid fa-file-prescription"></i> الروشتة</a> `;
+                            if (v.ecg_file) filesBadges += `<a href="${escapeHTML(v.ecg_file)}" target="_blank" class="badge bg-danger-subtle text-danger border border-danger-subtle file-badge text-decoration-none me-1 mb-1"><i class="fa-solid fa-heart-pulse"></i> رسم القلب</a> `;
+                            if (v.rays_file) filesBadges += `<a href="${escapeHTML(v.rays_file)}" target="_blank" class="badge bg-info-subtle text-info border border-info-subtle file-badge text-decoration-none me-1 mb-1"><i class="fa-solid fa-x-ray"></i> أشعة/إيكو</a> `;
+                            if (v.other_rays_file) filesBadges += `<a href="${escapeHTML(v.other_rays_file)}" target="_blank" class="badge bg-secondary-subtle text-secondary border border-secondary-subtle file-badge text-decoration-none me-1 mb-1"><i class="fa-solid fa-images"></i> أشعات أخرى</a> `;
+                            if (v.labs_file) filesBadges += `<a href="${escapeHTML(v.labs_file)}" target="_blank" class="badge bg-warning-subtle text-warning border border-warning-subtle file-badge text-decoration-none me-1 mb-1"><i class="fa-solid fa-vial"></i> التحاليل</a> `;
 
-        document.getElementById('visitForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
+                            visitsHTML += `
+                                <div class="visit-card">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <span class="badge bg-primary me-1">${escapeHTML(v.visit_type || 'كشف')}</span>
+                                            <small class="text-muted"><i class="fa-regular fa-calendar me-1"></i>${escapeHTML(v.visit_date || '')}</small>
+                                            <h6 class="fw-bold mt-2 text-dark mb-0">التشخيص: ${escapeHTML(v.diagnosis || 'غير محدد')}</h6>
+                                        </div>
+                                        <button class="btn btn-sm btn-light text-danger border" onclick="deleteVisit(${v.id})" title="حذف الزيارة"><i class="fa-solid fa-trash-can"></i></button>
+                                    </div>
+                                    ${v.medication_text ? `<div class="p-2 bg-light rounded my-2"><small class="fw-bold d-block text-secondary mb-1">العلاج:</small><pre class="mb-0 text-wrap" style="font-family: inherit; font-size: 0.9rem;">${escapeHTML(v.medication_text)}</pre></div>` : ''}
+                                    <div class="mt-2">${filesBadges}</div>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        visitsHTML = '<p class="text-muted small my-2">لا توجد زيارات مسجلة لهذا المريض.</p>';
+                    }
 
-            const visitTypeSelect = document.getElementById('visitType').value;
-            const finalVisitType = (visitTypeSelect === 'آخر') ? document.getElementById('customVisitType').value : visitTypeSelect;
-            formData.set('visitType', finalVisitType);
+                    accordion.innerHTML += `
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading${patient.id}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${patient.id}">
+                                    <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                                        <span class="fw-bold">${escapeHTML(patient.name)}</span>
+                                        <span class="badge bg-light text-secondary border me-3"><i class="fa-solid fa-phone me-1"></i>${escapeHTML(patient.phone)}</span>
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="collapse${patient.id}" class="accordion-collapse collapse" data-bs-parent="#patientsAccordion">
+                                <div class="accordion-body bg-white">
+                                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                        <span><strong>السن:</strong> ${patient.age || 'غير محدد'} سنة</span>
+                                        <div>
+                                            <button class="btn btn-sm btn-primary-subtle text-primary me-1 fw-bold" onclick="addNewVisitForPatient(${patient.id}, '${escapeHTML(patient.name)}', '${escapeHTML(patient.phone)}', ${patient.age})"><i class="fa-solid fa-plus me-1"></i> إضافة زيارة</button>
+                                            <button class="btn btn-sm btn-outline-danger" onclick="deletePatient(${patient.id})"><i class="fa-solid fa-trash me-1"></i> حذف</button>
+                                        </div>
+                                    </div>
+                                    <h6 class="fw-bold text-muted mb-2 small"><i class="fa-solid fa-clock-rotate-left me-1"></i> سجل الزيارات:</h6>
+                                    ${visitsHTML}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error("خطأ في جلب البيانات:", err);
+            }
+        }
 
-            const diagnosisSelect = document.getElementById('diagnosis').value;
-            const finalDiagnosis = (diagnosisSelect === 'آخر') ? document.getElementById('customDiagnosis').value : diagnosisSelect;
-            formData.set('diagnosis', finalDiagnosis);
+        document.getElementById('visitForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
 
-            try {
-                const res = await fetch('/api/visit', {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await res.json();
+            const visitTypeSelect = document.getElementById('visitType').value;
+            const finalVisitType = (visitTypeSelect === 'آخر') ? document.getElementById('customVisitType').value : visitTypeSelect;
+            formData.set('visitType', finalVisitType);
 
-                if (res.ok) {
-                    alert('تم حفظ البيانات بنجاح!');
-                    resetForm();
-                    loadPatients();
-                } else {
-                    alert(`خطأ: ${result.error || 'حدث خطأ غير معروف'}`);
-                }
-            } catch (err) {
-                alert('حدث خطأ أثناء الاتصال بالسيرفر.');
-            }
-        });
+            const diagnosisSelect = document.getElementById('diagnosis').value;
+            const finalDiagnosis = (diagnosisSelect === 'آخر') ? document.getElementById('customDiagnosis').value : diagnosisSelect;
+            formData.set('diagnosis', finalDiagnosis);
 
-        function addNewVisitForPatient(patientId, name, phone, age) {
-            resetForm();
-            document.getElementById('patientId').value = patientId;
-            document.getElementById('name').value = name;
-            document.getElementById('phone').value = phone;
-            document.getElementById('age').value = age || '';
-            document.getElementById('formTitle').innerHTML = `<i class="fa-solid fa-plus me-2"></i>إضافة زيارة لـ: ${name}`;
-            document.getElementById('resetBtn').classList.remove('d-none');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+            try {
+                const res = await fetch('/api/visit', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await res.json();
 
-        async function deletePatient(id) {
-            if (!confirm('هل أنت تأكد من حذف هذا المريض بكافة زياراته وملفاته؟')) return;
-            try {
-                const res = await fetch(`/api/patient/${id}`, { method: 'DELETE' });
-                if (res.ok) {
-                    loadPatients();
-                } else {
-                    alert('فشل حذف المريض');
-                }
-            } catch (err) {
-                alert('خطأ في شبكة الاتصال');
-            }
-        }
+                if (res.ok) {
+                    alert('تم حفظ البيانات بنجاح!');
+                    resetForm();
+                    loadPatients();
+                } else {
+                    alert(`خطأ: ${result.error || 'حدث خطأ غير معروف'}`);
+                }
+            } catch (err) {
+                alert('حدث خطأ أثناء الاتصال بالسيرفر.');
+            }
+        });
 
-        async function deleteVisit(id) {
-            if (!confirm('هل أنت تأكد من حذف هذه الزيارة؟')) return;
-            try {
-                const res = await fetch(`/api/visit/${id}`, { method: 'DELETE' });
-                if (res.ok) {
-                    loadPatients();
-                } else {
-                    alert('فشل حذف الزيارة');
-                }
-            } catch (err) {
-                alert('خطأ في شبكة الاتصال');
-            }
-        }
+        function addNewVisitForPatient(patientId, name, phone, age) {
+            resetForm();
+            document.getElementById('patientId').value = patientId;
+            document.getElementById('name').value = name;
+            document.getElementById('phone').value = phone;
+            document.getElementById('age').value = age || '';
+            document.getElementById('formTitle').innerHTML = `<i class="fa-solid fa-plus me-2 text-primary"></i>إضافة زيارة لـ: ${name}`;
+            document.getElementById('resetBtn').classList.remove('d-none');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
 
-        function searchPatients() {
-            const query = document.getElementById('searchInput').value;
-            loadPatients(query);
-        }
+        async function deletePatient(id) {
+            if (!confirm('هل أنت تأكد من حذف هذا المريض بكافة زياراته وملفاته؟')) return;
+            try {
+                const res = await fetch(`/api/patient/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    loadPatients();
+                } else {
+                    alert('فشل حذف المريض');
+                }
+            } catch (err) {
+                alert('خطأ في شبكة الاتصال');
+            }
+        }
 
-        function resetForm() {
-            document.getElementById('visitForm').reset();
-            document.getElementById('visitId').value = '';
-            document.getElementById('patientId').value = '';
-            document.getElementById('visitDate').valueAsDate = new Date();
-            document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-pen-to-square me-2"></i>تسجيل زيارة جديدة';
-            document.getElementById('resetBtn').classList.add('d-none');
-            toggleMedicationType('text');
-            document.getElementById('customVisitTypeDiv').classList.add('d-none');
-            document.getElementById('customDiagnosisDiv').classList.add('d-none');
-        }
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        async function deleteVisit(id) {
+            if (!confirm('هل أنت تأكد من حذف هذه الزيارة؟')) return;
+            try {
+                const res = await fetch(`/api/visit/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    loadPatients();
+                } else {
+                    alert('فشل حذف الزيارة');
+                }
+            } catch (err) {
+                alert('خطأ في شبكة الاتصال');
+            }
+        }
+
+        function searchPatients() {
+            const query = document.getElementById('searchInput').value;
+            loadPatients(query);
+        }
+
+        function resetForm() {
+            document.getElementById('visitForm').reset();
+            document.getElementById('visitId').value = '';
+            document.getElementById('patientId').value = '';
+            document.getElementById('visitDate').valueAsDate = new Date();
+            document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-user-plus me-2 text-primary"></i>تسجيل زيارة جديدة';
+            document.getElementById('resetBtn').classList.add('d-none');
+            toggleMedicationType('text');
+            document.getElementById('customVisitTypeDiv').classList.add('d-none');
+            document.getElementById('customDiagnosisDiv').classList.add('d-none');
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-</html> 
+</html>
