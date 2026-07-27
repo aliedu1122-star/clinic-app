@@ -167,7 +167,6 @@ app.post('/api/visit', (req, res, next) => {
             if (currentVisitRes.rows.length > 0) {
                 const current = currentVisitRes.rows[0];
 
-                // إذا جرى رفع صورة جديدة يُمحى الملف القديم من Cloudinary
                 if (newMedFile && current.medication_file) await deleteCloudinaryFile(current.medication_file);
                 if (newEcgFile && current.ecg_file) await deleteCloudinaryFile(current.ecg_file);
                 if (newRaysFile && current.rays_file) await deleteCloudinaryFile(current.rays_file);
