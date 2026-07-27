@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const archiver = require('archiver');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -52,7 +53,6 @@ const db = createClient({
 // إنشاء الجداول في حالة عدم وجودها
 async function initDb() {
     try {
-        // تم إزالة UNIQUE من phone للسماح بتكرار الرقم لمرضى متكررين بدون اختيار زر التعيين الصريح
         await db.execute(`
             CREATE TABLE IF NOT EXISTS patients (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -126,13 +126,11 @@ app.post('/api/visit', (req, res, next) => {
         let patientId = passedPatientId ? parseInt(passedPatientId) : null;
 
         if (patientId) {
-            // يتم التحديث فقط إذا قام الطبيب بالنقر صراحة على إضافة زيارة لمريض محدد
             await db.execute({
                 sql: 'UPDATE patients SET name = ?, age = ?, phone = ? WHERE id = ?',
                 args: [cleanName, parsedAge, cleanPhone, patientId]
             });
         } else {
-            // في حالة عدم إرسال patientId ينشئ سجلاً جديداً دائماً حتى مع تشابه الاسم أو الهاتف
             let insertRes = await db.execute({
                 sql: 'INSERT INTO patients (name, age, phone) VALUES (?, ?, ?)',
                 args: [cleanName, parsedAge, cleanPhone]
@@ -217,7 +215,7 @@ app.get('/api/patients', async (req, res) => {
                     medication_type: row.medication_type, medication_text: row.medication_text,
                     medication_file: row.medication_file, has_ecg: row.has_ecg, ecg_file: row.ecg_file,
                     has_rays: row.has_rays, rays_file: row.rays_file,
-                    has_other_rays: row.has_other_rays, other_rays_file: row.other_rays_file,
+                    has_other_rays: row.other_rays_file, other_rays_file: row.other_rays_file,
                     has_labs: row.has_labs, labs_file: row.labs_file
                 });
             }
@@ -227,6 +225,31 @@ app.get('/api/patients', async (req, res) => {
     } catch (error) {
         console.error("Fetch Error:", error);
         res.status(500).json({ error: 'خطأ في جلب بيانات المرضى' });
+    }
+});
+
+// إنشاء وتنزيل نسخة احتياطية بصيغة ZIP
+app.get('/api/backup', async (req, res) => {
+    try {
+        const patientsRes = await db.execute('SELECT * FROM patients');
+        const visitsRes = await db.execute('SELECT * FROM visits');
+
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="clinic_backup_${Date.now()}.zip"`);
+
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        archive.on('error', (err) => { throw err; });
+        archive.pipe(res);
+
+        archive.append(JSON.stringify(patientsRes.rows, null, 2), { name: 'patients.json' });
+        archive.append(JSON.stringify(visitsRes.rows, null, 2), { name: 'visits.json' });
+
+        await archive.finalize();
+    } catch (error) {
+        console.error("Backup Error:", error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'حدث خطأ أثناء إنشاء النسخة الاحتياطية' });
+        }
     }
 });
 
