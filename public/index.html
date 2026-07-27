@@ -39,11 +39,6 @@
             border-right: 4px solid #0d6efd;
             background-color: #fdfdfd;
         }
-        .badge-custom {
-            font-size: 0.85rem;
-            padding: 6px 12px;
-            border-radius: 6px;
-        }
     </style>
 </head>
 <body>
@@ -61,7 +56,7 @@
             <div class="col-lg-5">
                 <div class="card">
                     <div class="card-header text-primary d-flex justify-content-between align-items-center">
-                        <span id="formTitle"><i class="fa-solid fa-pen-to-square me-2"></i>تسجيل / تعديل زيارة</span>
+                        <span id="formTitle"><i class="fa-solid fa-pen-to-square me-2"></i>تسجيل زيارة جديدة</span>
                         <button class="btn btn-sm btn-outline-secondary d-none" id="resetBtn" onclick="resetForm()">إلغاء التعديل</button>
                     </div>
                     <div class="card-body">
@@ -95,7 +90,7 @@
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">نوع الزيارة</label>
-                                    <select class="form-select" id="visitType" name="visitType" onchange="toggleCustomInput('visitType', 'customVisitTypeDiv')">
+                                    <select class="form-select" id="visitType" name="visitTypeSelect" onchange="toggleCustomInput('visitType', 'customVisitTypeDiv')">
                                         <option value="كشف">كشف</option>
                                         <option value="متابعه">متابعة</option>
                                         <option value="استشارة">استشارة</option>
@@ -106,12 +101,12 @@
 
                             <div class="mb-3 d-none" id="customVisitTypeDiv">
                                 <label class="form-label">حدد نوع الزيارة الآخر</label>
-                                <input type="text" class="form-control" id="customVisitType" name="customVisitType">
+                                <input type="text" class="form-control" id="customVisitType" placeholder="نوع الزيارة المخصص">
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label">التشخيص</label>
-                                <select class="form-select mb-2" id="diagnosis" name="diagnosis" onchange="toggleCustomInput('diagnosis', 'customDiagnosisDiv')">
+                                <select class="form-select mb-2" id="diagnosis" name="diagnosisSelect" onchange="toggleCustomInput('diagnosis', 'customDiagnosisDiv')">
                                     <option value="">اختر التشخيص...</option>
                                     <option value="ارتفاع ضغط الدم">ارتفاع ضغط الدم</option>
                                     <option value="قصور بالشرايين التاجية">قصور بالشرايين التاجية</option>
@@ -121,7 +116,7 @@
                             </div>
 
                             <div class="mb-3 d-none" id="customDiagnosisDiv">
-                                <input type="text" class="form-control" id="customDiagnosis" name="customDiagnosis" placeholder="أدخل التشخيص المخصص">
+                                <input type="text" class="form-control" id="customDiagnosis" placeholder="أدخل التشخيص المخصص">
                             </div>
 
                             <div class="mb-3">
@@ -190,9 +185,7 @@
                             <input type="text" class="form-control" id="searchInput" placeholder="بحث باسم المريض أو رقم الهاتف..." onkeyup="searchPatients()">
                         </div>
 
-                        <div id="patientsAccordion" class="accordion">
-                            <!-- سيتم تحميل سجلات المرضى هنا ديناميكياً -->
-                        </div>
+                        <div id="patientsAccordion" class="accordion"></div>
                     </div>
                 </div>
             </div>
@@ -226,9 +219,11 @@
             if (type === 'text') {
                 document.getElementById('medTextInput').classList.remove('d-none');
                 document.getElementById('medFileInput').classList.add('d-none');
+                document.getElementById('medicationFile').value = ''; 
             } else {
                 document.getElementById('medTextInput').classList.add('d-none');
                 document.getElementById('medFileInput').classList.remove('d-none');
+                document.getElementById('medicationText').value = ''; 
             }
         }
 
@@ -239,33 +234,22 @@
                 const accordion = document.getElementById('patientsAccordion');
                 accordion.innerHTML = '';
 
-                if (patients.length === 0) {
+                if (!patients || patients.length === 0) {
                     accordion.innerHTML = '<div class="text-center text-muted p-4">لا توجد سجلات مطابقة.</div>';
                     return;
                 }
 
-                patients.forEach((patient, index) => {
+                patients.forEach((patient) => {
                     let visitsHTML = '';
                     if (patient.visits && patient.visits.length > 0) {
                         patient.visits.forEach(v => {
                             let filesBadges = '';
                             
-                            // الاستدعاء المباشر لرابط الخدمة السحابية Cloudinary
-                            if (v.medication_file) {
-                                filesBadges += `<a href="${escapeHTML(v.medication_file)}" target="_blank" class="badge bg-primary text-decoration-none me-1 mb-1"><i class="fa-solid fa-file-prescription"></i> الروشتة</a> `;
-                            }
-                            if (v.ecg_file) {
-                                filesBadges += `<a href="${escapeHTML(v.ecg_file)}" target="_blank" class="badge bg-danger text-decoration-none me-1 mb-1"><i class="fa-solid fa-heart-pulse"></i> رسم القلب</a> `;
-                            }
-                            if (v.rays_file) {
-                                filesBadges += `<a href="${escapeHTML(v.rays_file)}" target="_blank" class="badge bg-info text-dark text-decoration-none me-1 mb-1"><i class="fa-solid fa-x-ray"></i> أشعة/إيكو</a> `;
-                            }
-                            if (v.other_rays_file) {
-                                filesBadges += `<a href="${escapeHTML(v.other_rays_file)}" target="_blank" class="badge bg-secondary text-decoration-none me-1 mb-1"><i class="fa-solid fa-images"></i> أشعات أخرى</a> `;
-                            }
-                            if (v.labs_file) {
-                                filesBadges += `<a href="${escapeHTML(v.labs_file)}" target="_blank" class="badge bg-warning text-dark text-decoration-none me-1 mb-1"><i class="fa-solid fa-vial"></i> التحاليل</a> `;
-                            }
+                            if (v.medication_file) filesBadges += `<a href="${escapeHTML(v.medication_file)}" target="_blank" class="badge bg-primary text-decoration-none me-1 mb-1"><i class="fa-solid fa-file-prescription"></i> الروشتة</a> `;
+                            if (v.ecg_file) filesBadges += `<a href="${escapeHTML(v.ecg_file)}" target="_blank" class="badge bg-danger text-decoration-none me-1 mb-1"><i class="fa-solid fa-heart-pulse"></i> رسم القلب</a> `;
+                            if (v.rays_file) filesBadges += `<a href="${escapeHTML(v.rays_file)}" target="_blank" class="badge bg-info text-dark text-decoration-none me-1 mb-1"><i class="fa-solid fa-x-ray"></i> أشعة/إيكو</a> `;
+                            if (v.other_rays_file) filesBadges += `<a href="${escapeHTML(v.other_rays_file)}" target="_blank" class="badge bg-secondary text-decoration-none me-1 mb-1"><i class="fa-solid fa-images"></i> أشعات أخرى</a> `;
+                            if (v.labs_file) filesBadges += `<a href="${escapeHTML(v.labs_file)}" target="_blank" class="badge bg-warning text-dark text-decoration-none me-1 mb-1"><i class="fa-solid fa-vial"></i> التحاليل</a> `;
 
                             visitsHTML += `
                                 <div class="card visit-card mb-2 p-3">
@@ -276,7 +260,7 @@
                                             <h6 class="fw-bold mt-1 text-dark">التشخيص: ${escapeHTML(v.diagnosis || 'غير محدد')}</h6>
                                         </div>
                                         <div>
-                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteVisit(${v.id})" title="حذف الزيارة"><i class="fa-solid fa-trash"></i></button>
+                                            <button class="btn btn-sm btn-outline-danger ms-1" onclick="deleteVisit(${v.id})" title="حذف الزيارة"><i class="fa-solid fa-trash"></i></button>
                                         </div>
                                     </div>
                                     ${v.medication_text ? `<div class="p-2 bg-light rounded mt-2"><small class="fw-bold d-block">العلاج:</small><pre class="mb-0 text-wrap" style="font-family: inherit;">${escapeHTML(v.medication_text)}</pre></div>` : ''}
@@ -305,7 +289,8 @@
                                             <span><strong>السن:</strong> ${patient.age || 'غير محدد'} سنة</span>
                                         </div>
                                         <div>
-                                            <button class="btn btn-sm btn-outline-danger me-1" onclick="deletePatient(${patient.id})"><i class="fa-solid fa-user-xmark"></i> حذف المريض</button>
+                                            <button class="btn btn-sm btn-outline-primary me-1" onclick="addNewVisitForPatient(${patient.id}, '${escapeHTML(patient.name)}', '${escapeHTML(patient.phone)}', ${patient.age})"><i class="fa-solid fa-plus"></i> إضافة زيارة جديدة</button>
+                                            <button class="btn btn-sm btn-outline-danger" onclick="deletePatient(${patient.id})"><i class="fa-solid fa-user-xmark"></i> حذف المريض</button>
                                         </div>
                                     </div>
                                     <hr>
@@ -325,6 +310,15 @@
             e.preventDefault();
             const formData = new FormData(e.target);
 
+            // معالجة قيم "آخر" قبل الإرسال للسيرفر
+            const visitTypeSelect = document.getElementById('visitType').value;
+            const finalVisitType = (visitTypeSelect === 'آخر') ? document.getElementById('customVisitType').value : visitTypeSelect;
+            formData.set('visitType', finalVisitType);
+
+            const diagnosisSelect = document.getElementById('diagnosis').value;
+            const finalDiagnosis = (diagnosisSelect === 'آخر') ? document.getElementById('customDiagnosis').value : diagnosisSelect;
+            formData.set('diagnosis', finalDiagnosis);
+
             try {
                 const res = await fetch('/api/visit', {
                     method: 'POST',
@@ -337,12 +331,23 @@
                     resetForm();
                     loadPatients();
                 } else {
-                    alert(`خطأ: ${result.error}`);
+                    alert(`خطأ: ${result.error || 'حدث خطأ غير معروف'}`);
                 }
             } catch (err) {
                 alert('حدث خطأ أثناء الاتصال بالسيرفر.');
             }
         });
+
+        function addNewVisitForPatient(patientId, name, phone, age) {
+            resetForm();
+            document.getElementById('patientId').value = patientId;
+            document.getElementById('name').value = name;
+            document.getElementById('phone').value = phone;
+            document.getElementById('age').value = age || '';
+            document.getElementById('formTitle').innerHTML = `<i class="fa-solid fa-plus me-2"></i>إضافة زيارة لـ: ${name}`;
+            document.getElementById('resetBtn').classList.remove('d-none');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
 
         async function deletePatient(id) {
             if (!confirm('هل أنت تأكد من حذف هذا المريض بكافة زياراته وملفاته؟')) return;
@@ -382,7 +387,7 @@
             document.getElementById('visitId').value = '';
             document.getElementById('patientId').value = '';
             document.getElementById('visitDate').valueAsDate = new Date();
-            document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-pen-to-square me-2"></i>تسجيل / تعديل زيارة';
+            document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-pen-to-square me-2"></i>تسجيل زيارة جديدة';
             document.getElementById('resetBtn').classList.add('d-none');
             toggleMedicationType('text');
             document.getElementById('customVisitTypeDiv').classList.add('d-none');
