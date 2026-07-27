@@ -223,11 +223,23 @@
                         </a>
                     </div>
                     <div class="card-body p-4">
-                        <div class="input-group mb-4">
+                        <!-- خيارا العرض: تسجيل حالة جديدة أم البحث -->
+                        <div class="btn-group w-100 mb-4" role="group">
+                            <button type="button" class="btn btn-outline-primary active" id="btnModeSearch" onclick="switchViewMode('search')">
+                                <i class="fa-solid fa-magnifying-glass me-1"></i> البحث في المرضى
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" id="btnModeNew" onclick="switchViewMode('new')">
+                                <i class="fa-solid fa-user-plus me-1"></i> تسجيل حالة جديدة
+                            </button>
+                        </div>
+
+                        <!-- شريط البحث يُعرض فقط عند تفعيل خيار البحث -->
+                        <div class="input-group mb-4" id="searchContainer">
                             <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
                             <input type="text" class="form-control border-start-0" id="searchInput" placeholder="بحث باسم المريض أو رقم الهاتف..." onkeyup="searchPatients()">
                         </div>
 
+                        <!-- الأكوردين لعرض قائمة المرضى -->
                         <div id="patientsAccordion" class="accordion"></div>
                     </div>
                 </div>
@@ -236,10 +248,31 @@
     </div>
 
     <script>
+        let searchTimeout = null;
+
         document.addEventListener('DOMContentLoaded', () => {
             loadPatients();
             document.getElementById('visitDate').valueAsDate = new Date();
         });
+
+        function switchViewMode(mode) {
+            const searchContainer = document.getElementById('searchContainer');
+            const btnSearch = document.getElementById('btnModeSearch');
+            const btnNew = document.getElementById('btnModeNew');
+
+            if (mode === 'new') {
+                btnNew.classList.add('active');
+                btnSearch.classList.remove('active');
+                searchContainer.classList.add('d-none');
+                resetForm();
+                document.getElementById('name').focus();
+            } else {
+                btnSearch.classList.add('active');
+                btnNew.classList.remove('active');
+                searchContainer.classList.remove('d-none');
+                loadPatients(document.getElementById('searchInput').value);
+            }
+        }
 
         function escapeHTML(str) {
             if (!str) return '';
@@ -420,8 +453,11 @@
         }
 
         function searchPatients() {
-            const query = document.getElementById('searchInput').value;
-            loadPatients(query);
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const query = document.getElementById('searchInput').value;
+                loadPatients(query);
+            }, 300);
         }
 
         function resetForm() {
