@@ -44,7 +44,7 @@ if (rawUrl.startsWith("libsql://")) {
     rawUrl = "https://" + rawUrl;
 }
 
-// إنشاء اتصال HTTP مباشر ويلغي طلبات Migrations التلقائية
+// إنشاء اتصال HTTP مباشر
 const db = createClient({
     url: rawUrl,
     authToken: (process.env.TURSO_AUTH_TOKEN || "").trim()
@@ -89,6 +89,20 @@ async function initDb() {
     }
 }
 initDb();
+
+// دالة مساعدة لحذف الصور والملفات من Cloudinary
+async function deleteCloudinaryFile(fileUrl) {
+    if (!fileUrl) return;
+    try {
+        const parts = fileUrl.split('/');
+        const fileNameWithExt = parts.pop();
+        const folderName = parts.pop();
+        const publicId = `${folderName}/${fileNameWithExt.split('.')[0]}`;
+        await cloudinary.uploader.destroy(publicId);
+    } catch (err) {
+        console.error("Cloudinary Delete Error:", err.message || err);
+    }
+}
 
 const cpUpload = upload.fields([
     { name: 'medicationFile', maxCount: 1 },
@@ -138,11 +152,11 @@ app.post('/api/visit', (req, res, next) => {
             patientId = Number(insertRes.lastInsertRowid);
         }
 
-        const medFile = req.files?.['medicationFile']?.[0]?.path || null;
-        const ecgFile = req.files?.['ecgFile']?.[0]?.path || null;
-        const raysFile = req.files?.['raysFile']?.[0]?.path || null;
-        const otherRaysFile = req.files?.['otherRaysFile']?.[0]?.path || null;
-        const labsFile = req.files?.['labsFile']?.[0]?.path || null;
+        const newMedFile = req.files?.['medicationFile']?.[0]?.path || null;
+        const newEcgFile = req.files?.['ecgFile']?.[0]?.path || null;
+        const newRaysFile = req.files?.['raysFile']?.[0]?.path || null;
+        const newOtherRaysFile = req.files?.['otherRaysFile']?.[0]?.path || null;
+        const newLabsFile = req.files?.['labsFile']?.[0]?.path || null;
 
         if (visitId && visitId !== '') {
             let currentVisitRes = await db.execute({
@@ -151,7 +165,15 @@ app.post('/api/visit', (req, res, next) => {
             });
 
             if (currentVisitRes.rows.length > 0) {
-                const currentVisit = currentVisitRes.rows[0];
+                const current = currentVisitRes.rows[0];
+
+                // إذا جرى رفع صورة جديدة يُمحى الملف القديم من Cloudinary
+                if (newMedFile && current.medication_file) await deleteCloudinaryFile(current.medication_file);
+                if (newEcgFile && current.ecg_file) await deleteCloudinaryFile(current.ecg_file);
+                if (newRaysFile && current.rays_file) await deleteCloudinaryFile(current.rays_file);
+                if (newOtherRaysFile && current.other_rays_file) await deleteCloudinaryFile(current.other_rays_file);
+                if (newLabsFile && current.labs_file) await deleteCloudinaryFile(current.labs_file);
+
                 await db.execute({
                     sql: `
                         UPDATE visits SET 
@@ -162,10 +184,12 @@ app.post('/api/visit', (req, res, next) => {
                     `,
                     args: [
                         visitDate, finalVisitType, finalDiagnosis || '', medicationType || 'text', medicationText || '',
-                        medFile || currentVisit.medication_file, hasEcg || 'لا', ecgFile || currentVisit.ecg_file,
-                        hasRays || 'لا', raysFile || currentVisit.rays_file,
-                        hasOtherRays || 'لا', otherRaysFile || currentVisit.other_rays_file,
-                        hasLabs || 'لا', labsFile || currentVisit.labs_file, visitId
+                        newMedFile || current.medication_file, 
+                        hasEcg || (newEcgFile || current.ecg_file ? 'نعم' : 'لا'), newEcgFile || current.ecg_file,
+                        hasRays || (newRaysFile || current.rays_file ? 'نعم' : 'لا'), newRaysFile || current.rays_file,
+                        hasOtherRays || (newOtherRaysFile || current.other_rays_file ? 'نعم' : 'لا'), newOtherRaysFile || current.other_rays_file,
+                        hasLabs || (newLabsFile || current.labs_file ? 'نعم' : 'لا'), newLabsFile || current.labs_file, 
+                        visitId
                     ]
                 });
             }
@@ -175,7 +199,14 @@ app.post('/api/visit', (req, res, next) => {
                     INSERT INTO visits (patient_id, visit_date, visit_type, diagnosis, medication_type, medication_text, medication_file, has_ecg, ecg_file, has_rays, rays_file, has_other_rays, other_rays_file, has_labs, labs_file)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `,
-                args: [patientId, visitDate, finalVisitType, finalDiagnosis || '', medicationType || 'text', medicationText || '', medFile, hasEcg || 'لا', ecgFile, hasRays || 'لا', raysFile, hasOtherRays || 'لا', otherRaysFile, hasLabs || 'لا', labsFile]
+                args: [
+                    patientId, visitDate, finalVisitType, finalDiagnosis || '', medicationType || 'text', medicationText || '', 
+                    newMedFile, 
+                    hasEcg || (newEcgFile ? 'نعم' : 'لا'), newEcgFile, 
+                    hasRays || (newRaysFile ? 'نعم' : 'لا'), newRaysFile, 
+                    hasOtherRays || (newOtherRaysFile ? 'نعم' : 'لا'), newOtherRaysFile, 
+                    hasLabs || (newLabsFile ? 'نعم' : 'لا'), newLabsFile
+                ]
             });
         }
 
@@ -215,7 +246,7 @@ app.get('/api/patients', async (req, res) => {
                     medication_type: row.medication_type, medication_text: row.medication_text,
                     medication_file: row.medication_file, has_ecg: row.has_ecg, ecg_file: row.ecg_file,
                     has_rays: row.has_rays, rays_file: row.rays_file,
-                    has_other_rays: row.other_rays_file, other_rays_file: row.other_rays_file,
+                    has_other_rays: row.has_other_rays, other_rays_file: row.other_rays_file,
                     has_labs: row.has_labs, labs_file: row.labs_file
                 });
             }
@@ -253,9 +284,22 @@ app.get('/api/backup', async (req, res) => {
     }
 });
 
-// حذف مريض
+// حذف مريض ومسح ملفاته
 app.delete('/api/patient/:id', async (req, res) => {
     try {
+        const visitsRes = await db.execute({
+            sql: 'SELECT medication_file, ecg_file, rays_file, other_rays_file, labs_file FROM visits WHERE patient_id = ?',
+            args: [req.params.id]
+        });
+
+        for (const v of visitsRes.rows) {
+            if (v.medication_file) await deleteCloudinaryFile(v.medication_file);
+            if (v.ecg_file) await deleteCloudinaryFile(v.ecg_file);
+            if (v.rays_file) await deleteCloudinaryFile(v.rays_file);
+            if (v.other_rays_file) await deleteCloudinaryFile(v.other_rays_file);
+            if (v.labs_file) await deleteCloudinaryFile(v.labs_file);
+        }
+
         await db.execute({ sql: 'DELETE FROM patients WHERE id = ?', args: [req.params.id] });
         res.json({ success: true, message: 'تم حذف سجل المريض بنجاح' });
     } catch (error) {
@@ -263,9 +307,23 @@ app.delete('/api/patient/:id', async (req, res) => {
     }
 });
 
-// حذف زيارة
+// حذف زيارة ومسح ملفاتها
 app.delete('/api/visit/:id', async (req, res) => {
     try {
+        const visitRes = await db.execute({
+            sql: 'SELECT medication_file, ecg_file, rays_file, other_rays_file, labs_file FROM visits WHERE id = ?',
+            args: [req.params.id]
+        });
+
+        if (visitRes.rows.length > 0) {
+            const v = visitRes.rows[0];
+            if (v.medication_file) await deleteCloudinaryFile(v.medication_file);
+            if (v.ecg_file) await deleteCloudinaryFile(v.ecg_file);
+            if (v.rays_file) await deleteCloudinaryFile(v.rays_file);
+            if (v.other_rays_file) await deleteCloudinaryFile(v.other_rays_file);
+            if (v.labs_file) await deleteCloudinaryFile(v.labs_file);
+        }
+
         await db.execute({ sql: 'DELETE FROM visits WHERE id = ?', args: [req.params.id] });
         res.json({ success: true, message: 'تم حذف الزيارة بنجاح' });
     } catch (error) {
