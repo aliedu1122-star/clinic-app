@@ -11,8 +11,10 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// مفتاح تشفير التوكن (يمكنك تغييره أو وضعه في ملف .env)
+// إعداد بيانات الأمان وتسجيل الدخول من process.env أو القيم الافتراضية
 const JWT_SECRET = process.env.JWT_SECRET || 'clinic_secret_key_heart_1471155';
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'moclinc147';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Drheart1155##';
 
 // إعداد Cloudinary
 cloudinary.config({
@@ -102,7 +104,7 @@ app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
 
     // التحقق من بيانات الدخول
-    if (username === 'moclinc147' && password === 'Drheart1155##') {
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
         // إنشاء التوكن وصلاحيته سنتين لراحة الطبيب
         const token = jwt.sign({ user: username }, JWT_SECRET, { expiresIn: '730d' });
         return res.json({ success: true, token });
@@ -111,7 +113,7 @@ app.post('/api/login', (req, res) => {
     return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
 });
 
-// Middlware لحماية الـ APIs ومنع أي وصول غير مصرح
+// Middleware لحماية الـ APIs ومنع أي وصول غير مصرح
 const requireAuth = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
